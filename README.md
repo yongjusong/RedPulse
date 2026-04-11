@@ -2,7 +2,7 @@
 
 RedPulse는 물리적인 자원과 시간을 소비하지 않고, 인공지능(AI)과 가상 시뮬레이션을 통해 다양한 스토리지 구성(TLC, QLC, Hybrid)의 **잔여 수명(RUL, Remaining Useful Life)**을 단 몇 초 만에 예측해내는 프리미엄 웹 기반 대시보드 도구입니다.
 
-## 🌟 두 가지 핵심 예측 모드 (Dual Prediction Modes)
+## 두 가지 핵심 예측 모드 (Dual Prediction Modes)
 
 RedPulse 시뮬레이터는 사용자의 기획 단계와 검증 단계에 맞춰 가장 효율적인 두 가지 예측 모드를 제공합니다.
 
@@ -18,7 +18,7 @@ RedPulse 시뮬레이터는 사용자의 기획 단계와 검증 단계에 맞�
 
 ---
 
-## 💻 주요 워크플로우
+## 주요 워크플로우
 
 - **디바이스 토폴로지 설정**: 순수 고내구성(TLC), 고용량(QLC), 하이브리드(SLC+QLC) 방식 지원.
 - **데이터 분석 및 매핑**: (Mode 2 사용 시) 사용자 환경의 짧은 fio 로그나 트레이스 데이터를 요약 입력 시 AI 기반 궤적 보정.
@@ -26,13 +26,13 @@ RedPulse 시뮬레이터는 사용자의 기획 단계와 검증 단계에 맞�
 
 ---
 
-## 🛠️ 기술 스택 (Tech Stack)
+## 기술 스택 (Tech Stack)
 - **Backend**: Python 3, FastAPI, Scikit-Learn (AI Regression / Time-Series Extrapolation)
 - **Frontend**: React 18, Vite, Recharts, CSS (Glassmorphism & Dark Mode)
 
 ---
 
-## 🚀 설치 및 실행 방법
+## 설치 및 실행 방법
 
 ### 1. 백엔드 (Python FastAPI)
 ```bash
@@ -52,7 +52,7 @@ npm run dev
 
 ---
 
-## 📂 디렉토리 구조
+## 디렉토리 구조
 ```text
 redpulse/
 ├── backend/

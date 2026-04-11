@@ -81,7 +81,7 @@ function App() {
         </div>
 
         <button className="btn-run" onClick={handleSimulate} disabled={loading}>
-          {loading ? 'Simulating...' : 'Run Prediction 🚀'}
+          {loading ? 'Simulating...' : 'Run Prediction'}
         </button>
       </aside>
 
