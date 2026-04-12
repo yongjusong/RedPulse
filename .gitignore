@@ -1,0 +1,14 @@
+# Python environments
+backend/venv/
+__pycache__/
+*.pyc
+
+# Node environments
+frontend/node_modules/
+frontend/dist/
+
+# ML Models (Optional, but good practice to ignore auto-generated weight files)
+*.pkl
+
+# macOS system files
+.DS_Store
