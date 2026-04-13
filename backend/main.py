@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
+from datetime import datetime
 
 app = FastAPI(title="RedPulse Simulator API")
 
@@ -22,9 +23,33 @@ class SimulationRequest(BaseModel):
     randomSequentialRatio: int # e.g. 80 (for 80/20 random/seq)
     cacheSizeGB: Optional[int] = None # For Hybrid
 
+class AgentPayload(BaseModel):
+    node_name: str
+    drive_id: str
+    timestamp: str
+    waf: float
+    temperature_c: int
+    pe_cycles_used: int
+    available_spare_percent: int
+    read_mbps: float
+    write_mbps: float
+    iops: int
+
+# In-memory storage for MVP. In production, use DB (e.g., TimescaleDB)
+telemetry_db: List[AgentPayload] = []
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to RedPulse Simulation Engine"}
+
+@app.post("/api/v1/telemetry/ingest")
+def ingest_telemetry(payload: AgentPayload):
+    """
+    Endpoint for receiving real-time telemetry from on-premise agents.
+    """
+    telemetry_db.append(payload)
+    print(f"Received telemetry from {payload.node_name}:{payload.drive_id} -> WAF {payload.waf}")
+    return {"status": "success", "recorded_waf": payload.waf, "db_size": len(telemetry_db)}
 
 @app.post("/simulate")
 def run_simulation(req: SimulationRequest):
