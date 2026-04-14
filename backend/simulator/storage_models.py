@@ -93,3 +93,33 @@ class Hybrid_Drive:
     def health_percent(self) -> float:
         # System health is usually bottlenecked by backend
         return self.backend.health_percent
+
+class Commercial_Drive(DriveModel):
+    def __init__(self, capacity_gb: int, tbw: int, drive_type: str = "TLC"):
+        # PE cycles equivalent = (TBW * 1024) / capacity_gb
+        waf_base = 1.1
+        if drive_type == "QLC":
+            waf_base = 1.3
+        elif drive_type == "SLC":
+            waf_base = 1.0
+            
+        pe_cycles = int((tbw * 1024) / capacity_gb)
+        super().__init__(capacity_gb=capacity_gb, pe_cycles=pe_cycles, write_amplification_base=waf_base)
+        self.drive_type = drive_type
+        
+    def apply_write(self, write_gb: float, is_random: bool) -> float:
+        waf = self.waf_base
+        if is_random:
+            if self.drive_type == "QLC":
+                waf *= 4.0
+            elif self.drive_type == "TLC":
+                waf *= 2.5
+            elif self.drive_type == "SLC":
+                waf *= 1.2
+                
+        actual_nand_writes_gb = write_gb * waf
+        cycles_consumed = actual_nand_writes_gb / self.capacity_gb
+        self.current_pe_cycles += cycles_consumed
+        self.health_percent = max(0.0, 100 - (self.current_pe_cycles / self.pe_cycles_limit) * 100)
+        
+        return waf

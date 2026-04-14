@@ -1,24 +1,35 @@
-from .storage_models import TLC_Drive, QLC_Drive, Hybrid_Drive
+from .storage_models import TLC_Drive, QLC_Drive, Hybrid_Drive, Commercial_Drive
+from .vendors import COMMERCIAL_DRIVES
 
 def run_simulation_engine(
     drive_type: str,
     capacity_gb: int,
     daily_writes_gb: int,
     random_ratio: float,
-    cache_size_gb: int = 0
+    cache_size_gb: int = 0,
+    model_name: str = None
 ):
     """
     Simulates the wear over time until the drive fails (Health hits 0).
     Returns a time series describing the lifespan decay.
     """
-    if drive_type == "TLC":
-        drive = TLC_Drive(capacity_gb)
-    elif drive_type == "QLC":
-        drive = QLC_Drive(capacity_gb)
-    elif drive_type == "Hybrid":
-        drive = Hybrid_Drive(cache_size_gb, capacity_gb)
+    if model_name:
+        # Lookup the commercial drive spec
+        model_spec = next((d for d in COMMERCIAL_DRIVES if d["id"] == model_name), None)
+        if not model_spec:
+            raise ValueError(f"Commercial model not found: {model_name}")
+        drive = Commercial_Drive(capacity_gb=model_spec["capacityGB"], tbw=model_spec["tbw"], drive_type=model_spec["type"])
+        # Override these for accurate logging
+        drive_type = model_spec["type"]
     else:
-        raise ValueError(f"Unknown drive type: {drive_type}")
+        if drive_type == "TLC":
+            drive = TLC_Drive(capacity_gb)
+        elif drive_type == "QLC":
+            drive = QLC_Drive(capacity_gb)
+        elif drive_type == "Hybrid":
+            drive = Hybrid_Drive(cache_size_gb, capacity_gb)
+        else:
+            raise ValueError(f"Unknown drive type: {drive_type}")
 
     time_series = []
     day = 0

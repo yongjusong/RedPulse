@@ -22,6 +22,7 @@ class SimulationRequest(BaseModel):
     dailyWritesGB: int
     randomSequentialRatio: int # e.g. 80 (for 80/20 random/seq)
     cacheSizeGB: Optional[int] = None # For Hybrid
+    modelName: Optional[str] = None # Commercial drive ID
 
 class AgentPayload(BaseModel):
     node_name: str
@@ -51,6 +52,14 @@ def ingest_telemetry(payload: AgentPayload):
     print(f"Received telemetry from {payload.node_name}:{payload.drive_id} -> WAF {payload.waf}")
     return {"status": "success", "recorded_waf": payload.waf, "db_size": len(telemetry_db)}
 
+@app.get("/api/v1/models")
+def get_commercial_models():
+    """
+    Returns a list of supported commercial SSD models.
+    """
+    from simulator.vendors import COMMERCIAL_DRIVES
+    return {"status": "success", "data": COMMERCIAL_DRIVES}
+
 @app.post("/simulate")
 def run_simulation(req: SimulationRequest):
     """
@@ -65,7 +74,8 @@ def run_simulation(req: SimulationRequest):
         capacity_gb=req.capacityGB,
         daily_writes_gb=req.dailyWritesGB,
         random_ratio=random_ratio,
-        cache_size_gb=req.cacheSizeGB or 0
+        cache_size_gb=req.cacheSizeGB or 0,
+        model_name=req.modelName
     )
     
     return result
