@@ -4,8 +4,8 @@
 
 ## Phase 1: 실시간 데이터 수집 및 시뮬레이션 기반 강화 (Telemetry & Simulation)
 **목표**: 사용자 편의성 극대화, 신뢰도 확보 및 데이터 수집 파이프라인 자동화.
-- [가상 모드] **상용 디바이스 스펙 연동**: 삼성, 마이크론 등 실제 벤더의 SSD 제원(TBW, 스펙 시트)을 입력/불러오기하여 가상 시뮬레이션의 신뢰성을 대폭 향상.
-- [실측 모드] **Linux Native 지원 (CLI/Daemon)**: 웹 UI뿐만 아니라 리눅스 터미널(Headless Server)에서도 실측 및 예측 기능을 즉시 구동할 수 있는 환경 제공.
+- [PreFlight] **상용 디바이스 스펙 연동**: 삼성, 마이크론 등 실제 벤더의 SSD 제원(TBW, 스펙 시트)을 입력/불러오기하여 가상 시뮬레이션의 신뢰성을 대폭 향상.
+- [LiveOps] **Linux Native 지원 (CLI/Daemon)**: 웹 UI뿐만 아니라 리눅스 터미널(Headless Server)에서도 실측 및 예측 기능을 즉시 구동할 수 있는 환경 제공.
 - 실제 서버에 적용 가능한 경량 Daemon/Agent 개발
 - 주기적인 `smartctl` 및 `fio/iostat` 로그 캡처
 - 백엔드 FastAPI 서버 데이터 수신용 스트리밍 API 구축

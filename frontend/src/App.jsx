@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const translations = {
   EN: {
     title: "AI-Based SSD Lifespan Simulator",
-    virtualMode: "Virtual Mode",
-    telemetryMode: "Telemetry Mode",
-    configTitleV: "Virtual Topology",
-    configTitleT: "Telemetry Input",
+    virtualMode: "PreFlight Mode",
+    telemetryMode: "LiveOps Mode",
+    configTitleV: "PreFlight Configuration",
+    configTitleT: "LiveOps Telemetry Input",
+    vendorModel: "Commercial SSD Database",
+    genericCustom: "Generic Parameter (Custom)",
     driveTopology: "Drive Topology",
     pureTlc: "Pure TLC (High Endurance)",
     pureQlc: "Pure QLC (High Capacity)",
@@ -35,10 +37,12 @@ const translations = {
   },
   KR: {
     title: "AI 기반 SSD 수명 예측 시뮬레이터",
-    virtualMode: "가상 시뮬레이션",
-    telemetryMode: "실측 AI 추론",
-    configTitleV: "가상 환경 구성",
-    configTitleT: "실측치 기반 입력",
+    virtualMode: "PreFlight (도입 전 설계)",
+    telemetryMode: "LiveOps (라이브 실황)",
+    configTitleV: "PreFlight 구성",
+    configTitleT: "LiveOps 실측 데이터",
+    vendorModel: "상용 모델 DB 템플릿",
+    genericCustom: "사용자 직접 입력 (Generic)",
     driveTopology: "디바이스 토폴로지",
     pureTlc: "순수 TLC (고내구성)",
     pureQlc: "순수 QLC (고용량)",
@@ -57,8 +61,8 @@ const translations = {
     years: "년",
     avgWaf: "평균 쓰기 증폭",
     cacheHitRatio: "캐시 적중률",
-    chartTitleV: "노후화 궤적 (RUL) - 물리 연산",
-    chartTitleT: "노후화 궤적 (RUL) - AI 외삽 연산",
+    chartTitleV: "Degradation Curve (RUL) - PreFlight",
+    chartTitleT: "Degradation Curve (RUL) - LiveOps",
     xAxisLabel: "년",
     yAxisLabel: "SSD 건강 상태 (%)",
     eolLabel: "수명 종료",
@@ -72,9 +76,22 @@ function App() {
 
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
-  const [mode, setMode] = useState('Virtual'); // 'Virtual' or 'Telemetry'
+  const [mode, setMode] = useState('PreFlight'); // 'PreFlight' or 'LiveOps'
+  const [vendors, setVendors] = useState([]);
+  
+  useEffect(() => {
+    fetch('http://localhost:8000/api/v1/models')
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          setVendors(data.data);
+        }
+      })
+      .catch(err => console.error("Could not load vendor models", err));
+  }, []);
   
   const [config, setConfig] = useState({
+    modelName: '',
     driveType: 'QLC',
     capacityGB: 4000,
     dailyWritesGB: 2000, 
@@ -87,9 +104,10 @@ function App() {
   const handleSimulate = async () => {
     setLoading(true);
     try {
-      const endpoint = mode === 'Virtual' ? '/simulate' : '/extrapolate';
-      const bodyPayload = mode === 'Virtual' 
+      const endpoint = mode === 'PreFlight' ? '/simulate' : '/extrapolate';
+      const bodyPayload = mode === 'PreFlight' 
         ? {
+            modelName: config.modelName || null,
             driveType: config.driveType,
             capacityGB: config.capacityGB,
             readWriteRatio: 30, // Dummy
@@ -133,15 +151,7 @@ function App() {
           <div className="logo">RED<span>PULSE</span></div>
           <div style={{color: 'var(--text-secondary)'}}>{t.title}</div>
         </div>
-        <button 
-          onClick={toggleLanguage}
-          style={{
-            position: 'absolute', top: '10px', right: '10px',
-            background: 'var(--panel-bg)', color: 'var(--text-primary)',
-            border: '1px solid rgba(255,255,255,0.2)', padding: '5px 15px',
-            borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold'
-          }}
-        >
+        <button onClick={toggleLanguage} style={{ padding: '0.4rem 0.8rem', background: '#f4f4f5', color: '#18181b', border: '1px solid #d4d4d8', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
           🌐 {lang === 'EN' ? 'KOR' : 'ENG'}
         </button>
       </header>
@@ -150,41 +160,61 @@ function App() {
       <aside className="glass-panel config-section">
         <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
           <button 
-            style={{flex: 1, padding: '0.5rem', background: mode === 'Virtual' ? 'var(--accent-blue)' : 'rgba(0,0,0,0.3)', color: mode === 'Virtual' ? 'black' : 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem'}}
-            onClick={() => setMode('Virtual')}
+            style={{flex: 1, padding: '0.5rem', background: mode === 'PreFlight' ? '#111' : '#f4f4f5', color: mode === 'PreFlight' ? 'white' : 'black', border: '1px solid #d4d4d8', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem'}}
+            onClick={() => setMode('PreFlight')}
           >
             {t.virtualMode}
           </button>
           <button 
-            style={{flex: 1, padding: '0.5rem', background: mode === 'Telemetry' ? 'var(--accent-green)' : 'rgba(0,0,0,0.3)', color: mode === 'Telemetry' ? 'black' : 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem'}}
-            onClick={() => setMode('Telemetry')}
+            style={{flex: 1, padding: '0.5rem', background: mode === 'LiveOps' ? '#111' : '#f4f4f5', color: mode === 'LiveOps' ? 'white' : 'black', border: '1px solid #d4d4d8', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem'}}
+            onClick={() => setMode('LiveOps')}
           >
             {t.telemetryMode}
           </button>
         </div>
       
-        <h2>{mode === 'Virtual' ? t.configTitleV : t.configTitleT}</h2>
+        <h2>{mode === 'PreFlight' ? t.configTitleV : t.configTitleT}</h2>
         
-        <div className="form-group">
-          <label>{t.driveTopology}</label>
-          <select 
-            className="form-control"
-            value={config.driveType}
-            onChange={(e) => setConfig({...config, driveType: e.target.value})}
-          >
-            <option value="TLC">{t.pureTlc}</option>
-            <option value="QLC">{t.pureQlc}</option>
-            <option value="Hybrid">{t.hybrid}</option>
-          </select>
-        </div>
+        {mode === 'PreFlight' && (
+          <div className="form-group">
+            <label>{t.vendorModel}</label>
+            <select 
+              className="form-control"
+              value={config.modelName}
+              onChange={(e) => setConfig({...config, modelName: e.target.value})}
+            >
+              <option value="">{t.genericCustom}</option>
+              {vendors.map(v => (
+                <option key={v.id} value={v.id}>{v.vendor} {v.modelName} ({v.type}, {v.tbw} TBW)</option>
+              ))}
+            </select>
+          </div>
+        )}
+        
+        {mode === 'PreFlight' && !config.modelName && (
+          <div className="form-group">
+            <label>{t.driveTopology}</label>
+            <select 
+              className="form-control"
+              value={config.driveType}
+              onChange={(e) => setConfig({...config, driveType: e.target.value})}
+            >
+              <option value="TLC">{t.pureTlc}</option>
+              <option value="QLC">{t.pureQlc}</option>
+              <option value="Hybrid">{t.hybrid}</option>
+            </select>
+          </div>
+        )}
 
-        <div className="form-group">
-          <label>{t.backendCap}</label>
-          <input type="number" className="form-control" value={config.capacityGB} 
-            onChange={e => setConfig({...config, capacityGB: parseInt(e.target.value)})} />
-        </div>
+        {(!config.modelName || mode === 'LiveOps') && (
+          <div className="form-group">
+            <label>{t.backendCap}</label>
+            <input type="number" className="form-control" value={config.capacityGB} 
+              onChange={e => setConfig({...config, capacityGB: parseInt(e.target.value)})} />
+          </div>
+        )}
 
-        {config.driveType === 'Hybrid' && (
+        {mode === 'PreFlight' && config.driveType === 'Hybrid' && !config.modelName && (
           <div className="form-group">
             <label>{t.slcCacheSize}</label>
             <input type="number" className="form-control" value={config.cacheSizeGB} 
@@ -205,9 +235,9 @@ function App() {
             onChange={e => setConfig({...config, randomSequentialRatio: parseInt(e.target.value)})} />
         </div>
 
-        {mode === 'Telemetry' && (
-          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            <h3 style={{fontSize: '0.9rem', color: 'var(--accent-green)', marginBottom: '1rem'}}>{t.observedFio}</h3>
+        {mode === 'LiveOps' && (
+          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+            <h3 style={{fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '1rem', fontWeight: '600'}}>{t.observedFio}</h3>
             <div className="form-group">
               <label>{t.wafLabel}</label>
               <input type="number" step="0.1" className="form-control" value={config.observed_waf} 
@@ -223,8 +253,8 @@ function App() {
           </div>
         )}
 
-        <button className="btn-run" onClick={handleSimulate} disabled={loading} style={{ background: mode === 'Telemetry' ? 'linear-gradient(135deg, #39ff14 0%, #20b2aa 100%)' : '' }}>
-          {loading ? t.simulating : (mode === 'Virtual' ? t.runVirtual : t.runML)}
+        <button className="btn-run" onClick={handleSimulate} disabled={loading}>
+          {loading ? t.simulating : (mode === 'PreFlight' ? t.runVirtual : t.runML)}
         </button>
       </aside>
 
@@ -235,7 +265,7 @@ function App() {
             <div className="stats-grid">
               <div className="glass-panel stat-card">
                 <div className="stat-label">{t.predictedLife}</div>
-                <div className="stat-value" style={{color: results.predicted_rul_days > 1000 ? '#39ff14' : '#ff3366'}}>
+                <div className="stat-value">
                   {(results.predicted_rul_days / 365).toFixed(1)} <span style={{fontSize: '1rem'}}>{t.years}</span>
                 </div>
               </div>
@@ -243,44 +273,44 @@ function App() {
                 <div className="stat-label">{t.avgWaf}</div>
                 <div className="stat-value">{results.metrics.average_waf.toFixed(2)}x</div>
               </div>
-              <div className={`glass-panel stat-card ${config.driveType === 'Hybrid' ? 'hybrid' : ''}`}>
+              <div className="glass-panel stat-card">
                 <div className="stat-label">{t.cacheHitRatio}</div>
                 <div className="stat-value">{(results.metrics.cache_hit_ratio * 100).toFixed(1)}%</div>
               </div>
             </div>
 
             <div className="glass-panel">
-              <h2>{mode === 'Virtual' ? t.chartTitleV : t.chartTitleT}</h2>
+              <h2>{mode === 'PreFlight' ? t.chartTitleV : t.chartTitleT}</h2>
               <div className="chart-container">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={results.time_series_data} margin={{ top: 20, right: 30, left: 20, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
                     <XAxis 
                       dataKey="day" 
-                      stroke="#94a3b8" 
+                      stroke="#52525b" 
                       tickFormatter={(val) => `${t.xAxisLabel} ${(val/365).toFixed(1)}`} 
                     />
-                    <YAxis stroke="#94a3b8" domain={[0, 100]} />
+                    <YAxis stroke="#52525b" domain={[0, 100]} />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: 'rgba(22, 30, 46, 0.9)', border: '1px solid #00f0ff' }}
+                      contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #d4d4d8' }}
                     />
                     <Legend />
                     <Line 
                       type="monotone" 
                       dataKey="health_percent" 
                       name={t.yAxisLabel} 
-                      stroke={mode === 'Telemetry' ? '#39ff14' : '#00f0ff'} 
+                      stroke="#111111" 
                       strokeWidth={3} 
                       dot={false}
                     />
-                    <ReferenceLine y={0} stroke="#ff3366" strokeDasharray="3 3" label={t.eolLabel} />
+                    <ReferenceLine y={0} stroke="#a1a1aa" strokeDasharray="3 3" label={t.eolLabel} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
           </>
         ) : (
-          <div className="glass-panel" style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8'}}>
+          <div className="glass-panel" style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#52525b'}}>
             <h2>{t.emptyDash}</h2>
           </div>
         )}
