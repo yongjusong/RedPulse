@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import useAppStore from './store';
+import SingleNodeView from './components/SingleNodeView';
+import ClusterView from './components/ClusterView';
 
 const translations = {
   EN: {
@@ -74,10 +76,9 @@ function App() {
   const [lang, setLang] = useState('EN');
   const t = translations[lang];
 
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState(null);
-  const [mode, setMode] = useState('PreFlight'); // 'PreFlight' or 'LiveOps'
+  const { mode, setMode, config, setConfig, results, setResults, loading, setLoading } = useAppStore();
   const [vendors, setVendors] = useState([]);
+  const [activeTab, setActiveTab] = useState('single');
   
   useEffect(() => {
     fetch('http://localhost:8000/api/v1/models')
@@ -89,17 +90,6 @@ function App() {
       })
       .catch(err => console.error("Could not load vendor models", err));
   }, []);
-  
-  const [config, setConfig] = useState({
-    modelName: '',
-    driveType: 'QLC',
-    capacityGB: 4000,
-    dailyWritesGB: 2000, 
-    randomSequentialRatio: 80, 
-    cacheSizeGB: 100,
-    observed_waf: 2.1, 
-    observed_hit_ratio: 0.45 
-  });
 
   const handleSimulate = async () => {
     setLoading(true);
@@ -158,8 +148,23 @@ function App() {
 
       {/* Sidebar Configuration */}
       <aside className="glass-panel config-section">
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
-          <button 
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem', borderBottom: '2px solid #e4e4e7', paddingBottom: '0.5rem' }}>
+          <span 
+            onClick={() => setActiveTab('single')}
+            style={{ padding: '0.5rem', cursor: 'pointer', fontWeight: 'bold', borderBottom: activeTab === 'single' ? '2px solid #111' : 'none', color: activeTab === 'single' ? '#111' : '#a1a1aa' }}>
+            Simulator
+          </span>
+          <span 
+            onClick={() => setActiveTab('cluster')}
+            style={{ padding: '0.5rem', cursor: 'pointer', fontWeight: 'bold', borderBottom: activeTab === 'cluster' ? '2px solid #111' : 'none', color: activeTab === 'cluster' ? '#111' : '#a1a1aa' }}>
+            Cluster Grid
+          </span>
+        </div>
+
+        {activeTab === 'single' && (
+          <>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
+              <button 
             style={{flex: 1, padding: '0.5rem', background: mode === 'PreFlight' ? '#111' : '#f4f4f5', color: mode === 'PreFlight' ? 'white' : 'black', border: '1px solid #d4d4d8', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem'}}
             onClick={() => setMode('PreFlight')}
           >
@@ -256,64 +261,19 @@ function App() {
         <button className="btn-run" onClick={handleSimulate} disabled={loading}>
           {loading ? t.simulating : (mode === 'PreFlight' ? t.runVirtual : t.runML)}
         </button>
+        </>
+        )}
+
+        {activeTab === 'cluster' && (
+          <div style={{ color: '#52525b', fontSize: '0.9rem', lineHeight: '1.5' }}>
+            Viewing simulated cluster node data.<br/><br/>Filtering and global controls will be available shortly.
+          </div>
+        )}
       </aside>
 
       {/* Main Dashboard Area */}
       <main>
-        {results ? (
-          <>
-            <div className="stats-grid">
-              <div className="glass-panel stat-card">
-                <div className="stat-label">{t.predictedLife}</div>
-                <div className="stat-value">
-                  {(results.predicted_rul_days / 365).toFixed(1)} <span style={{fontSize: '1rem'}}>{t.years}</span>
-                </div>
-              </div>
-              <div className="glass-panel stat-card">
-                <div className="stat-label">{t.avgWaf}</div>
-                <div className="stat-value">{results.metrics.average_waf.toFixed(2)}x</div>
-              </div>
-              <div className="glass-panel stat-card">
-                <div className="stat-label">{t.cacheHitRatio}</div>
-                <div className="stat-value">{(results.metrics.cache_hit_ratio * 100).toFixed(1)}%</div>
-              </div>
-            </div>
-
-            <div className="glass-panel">
-              <h2>{mode === 'PreFlight' ? t.chartTitleV : t.chartTitleT}</h2>
-              <div className="chart-container">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={results.time_series_data} margin={{ top: 20, right: 30, left: 20, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-                    <XAxis 
-                      dataKey="day" 
-                      stroke="#52525b" 
-                      tickFormatter={(val) => `${t.xAxisLabel} ${(val/365).toFixed(1)}`} 
-                    />
-                    <YAxis stroke="#52525b" domain={[0, 100]} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #d4d4d8' }}
-                    />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="health_percent" 
-                      name={t.yAxisLabel} 
-                      stroke="#111111" 
-                      strokeWidth={3} 
-                      dot={false}
-                    />
-                    <ReferenceLine y={0} stroke="#a1a1aa" strokeDasharray="3 3" label={t.eolLabel} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="glass-panel" style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#52525b'}}>
-            <h2>{t.emptyDash}</h2>
-          </div>
-        )}
+        {activeTab === 'single' ? <SingleNodeView t={t} /> : <ClusterView t={t} />}
       </main>
     </div>
   );

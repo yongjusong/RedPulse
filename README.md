@@ -24,7 +24,29 @@ RedPulse 시뮬레이터는 사용자의 기획 단계와 검증 단계에 맞�
 
 - **디바이스 토폴로지 설정**: 순수 고내구성(TLC), 고용량(QLC), 하이브리드(SLC+QLC) 방식 지원.
 - **데이터 분석 및 매핑**: (LiveOps 구동 시) 사용자 환경의 실제 서버 텔레메트리 데이터를 수집하여 AI 기반 궤적 보정.
-- **다크 모드 엔터프라이즈 대시보드**: Write Amplification Factor (WAF) 지표와 수명 저하 궤적을 시각적인 차트로 렌더링.
+- **다중 노드 클러스터 대시보드**: 수백 대의 노드와 디스크 베이 상태를 한눈에 모니터링하는 엔터프라이즈 모니터링.
+
+---
+
+## 🚀 실행 및 배포 가이드 (Getting Started)
+
+### 1. 중앙 대시보드 서버 통합 실행 (Docker)
+Docker Compose를 사용하여 백엔드와 프론트엔드를 한 번에 실행할 수 있습니다.
+
+```bash
+docker-compose up --build
+```
+- **웹 대시보드**: `http://localhost:5173`
+- **백엔드 API**: `http://localhost:8000`
+
+### 2. 스토리지 노드 에이전트 배포 (CLI Agent)
+실제 수집이 필요한 각 서버(Linux)에서 에이전트를 데몬 모드로 실행하여 데이터를 중앙 서버로 보고합니다.
+
+```bash
+# 에이전트 60초 주기로 중앙 서버에 보고 시작
+./redpulse-cli.py report --node "Node-01" --interval 60
+```
+- 에이전트는 자동으로 로컬 디스크를 감지하여 상태 정보를 대시보드로 실시간 Push합니다.
 
 ---
 
@@ -34,23 +56,22 @@ RedPulse 시뮬레이터는 사용자의 기획 단계와 검증 단계에 맞�
 
 ---
 
-## 설치 및 실행 방법
+### 수동 설치 (Manual Setup)
+매뉴얼한 디버깅이나 개발 환경 구동 시 아래 명령어를 참고하세요.
 
-### 1. 백엔드 (Python FastAPI)
+#### 백엔드 (FastAPI)
 ```bash
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
-> API 서버: `http://localhost:8000`
 
-### 2. 프론트엔드 (React + Vite)
+#### 프론트엔드 (React)
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-> 웹 대시보드: `http://localhost:5173`
 
 ---
 

@@ -13,8 +13,8 @@
 ### 📝 Task Checklist
 - [x] FastAPI 백엔드 데이터 수신 엔드포인트 구축
 - [x] Python 기반 Mock 에이전트 스크립트 작성
-- [ ] 상용 드라이브 스펙 DB(JSON/CSV) 구축 및 가상 모드 입력 기능 개발
-- [ ] 리눅스 터미널 환경을 위한 RedPulse 텍스트 기반 인터페이스(TUI/CLI) 래퍼 개발
+- [x] 상용 드라이브 스펙 DB(JSON/CSV) 구축 및 가상 모드 입력 기능 개발
+- [x] 리눅스 터미널 환경을 위한 RedPulse 텍스트 기반 인터페이스(TUI/CLI) 래퍼 개발
 
 ## Phase 2: 다중 스토리지 클러스터 모니터링 (Cluster Dashboard)
 **목표**: 엔터프라이즈 환경에서의 확장성 확보.
@@ -22,10 +22,10 @@
 - 비정상 마모율을 보이는 디스크를 자동 그룹화 및 알림(Alerting)
 
 ### 📝 Task Checklist
-- [ ] 백엔드: 다중 디바이스 시계열 데이터를 캐싱하기 위한 구조 개선 (Redis 검토)
-- [ ] 프론트엔드: 기존 UI를 클러스터 뷰/그리드 뷰로 확장
+- [x] 백엔드: 다중 디바이스 시계열 데이터를 캐싱하기 위한 구조 개선 (In-memory structured mapping)
+- [x] 프론트엔드: 기존 UI를 클러스터 뷰/그리드 뷰로 확장
 - [ ] 프론트엔드: 필터링 및 드릴다운(Drill-down) 패널 개발
-- [ ] 프론트엔드: 상태 관리 라이브러리(Redux/Zustand 등) 도입 및 연동
+- [x] 프론트엔드: 상태 관리 라이브러리(Zustand) 도입 및 연동
 
 ## Phase 3: AI 모델 고도화 (Deep Learning / Time-Series AI)
 **목표**: 외삽(Extrapolation)의 예측 오차 최소화 및 장기 신뢰도 향상.

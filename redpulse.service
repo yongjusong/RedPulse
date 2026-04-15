@@ -1,0 +1,21 @@
+[Unit]
+Description=RedPulse AI SSD Simulator Unified Server
+After=network.target
+
+[Service]
+# User and Group to run as
+User=yongju
+Group=staff
+
+# Path to the unified binary
+ExecStart=/path/to/redpulse/dist_server_temp/redpulse-server
+
+# Restart policy for production reliability
+Restart=always
+RestartSec=5
+
+# Environment variables (if needed)
+Environment=PORT=8000
+
+[Install]
+WantedBy=multi-user.target

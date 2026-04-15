@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 app = FastAPI(title="RedPulse Simulator API")
 
@@ -14,6 +17,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Define frontend static directory
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+
+# Mount Static Files (Assets)
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
+
 
 class SimulationRequest(BaseModel):
     driveType: str # "TLC", "QLC", "Hybrid"
@@ -36,21 +47,116 @@ class AgentPayload(BaseModel):
     write_mbps: float
     iops: int
 
-# In-memory storage for MVP. In production, use DB (e.g., TimescaleDB)
-telemetry_db: List[AgentPayload] = []
+# In-memory storage for MVP: { node_name: { drive_id: latest_payload } }
+telemetry_db = {}
+
+@app.get("/api/v1/cluster/stats")
+def get_cluster_stats():
+    """
+    Returns aggregated metrics for the entire cluster.
+    """
+    total_nodes = len(telemetry_db)
+    total_disks = 0
+    critical_disks = 0
+    warning_disks = 0
+    
+    for node, drives in telemetry_db.items():
+        for drive_id, data in drives.items():
+            total_disks += 1
+            # Mock logic based on WAF or health (In real life, we'd use predicted_rul)
+            if data.waf > 5.0 or data.available_spare_percent < 10:
+                critical_disks += 1
+            elif data.waf > 3.0 or data.available_spare_percent < 30:
+                warning_disks += 1
+                
+    return {
+        "status": "success",
+        "data": {
+            "total_nodes": total_nodes,
+            "total_disks": total_disks,
+            "critical_alerts": critical_disks,
+            "warning_alerts": warning_disks,
+            "overall_health": 100 - (critical_disks * 10 + warning_disks * 2) / (total_disks or 1)
+        }
+    }
+
+@app.get("/api/v1/cluster/topology")
+def get_cluster_topology():
+    """
+    Returns the organized node/disk status for the cluster view cards.
+    """
+    topology = []
+    
+    for node_id, drives in telemetry_db.items():
+        disks = []
+        max_severity = 0
+        
+        # Sort drives by name/id for consistent slotting
+        sorted_drive_ids = sorted(drives.keys())
+        for idx, drive_id in enumerate(sorted_drive_ids):
+            data = drives[drive_id]
+            severity = 0
+            if data.waf > 5.0 or data.available_spare_percent < 10:
+                severity = 2
+            elif data.waf > 3.0 or data.available_spare_percent < 30:
+                severity = 1
+                
+            if severity > max_severity:
+                max_severity = severity
+                
+            disks.append({
+                "slot": idx + 1,
+                "drive_id": drive_id,
+                "health": 100 - (data.waf * 5), # Mock health calc for visual
+                "severity": severity,
+                "waf": data.waf,
+                "temp": data.temperature_c
+            })
+            
+        topology.append({
+            "id": node_id,
+            "disks": disks,
+            "maxSeverity": max_severity
+        })
+        
+    return {"status": "success", "data": topology}
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to RedPulse Simulation Engine"}
+    """
+    Serve the main index.html for the root path.
+    """
+    index_file = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"message": "Welcome to RedPulse Simulation Engine (Frontend assets not found)"}
+
+@app.get("/{full_path:path}")
+def serve_spa(full_path: str):
+    """
+    Catch-all route to support React SPA routing.
+    """
+    # If path starts with api/, it's a 404 for API
+    if full_path.startswith("api/"):
+        return {"error": "Not Found"}
+    
+    index_file = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"error": "Frontend assets not found"}
 
 @app.post("/api/v1/telemetry/ingest")
 def ingest_telemetry(payload: AgentPayload):
     """
     Endpoint for receiving real-time telemetry from on-premise agents.
     """
-    telemetry_db.append(payload)
+    if payload.node_name not in telemetry_db:
+        telemetry_db[payload.node_name] = {}
+    
+    telemetry_db[payload.node_name][payload.drive_id] = payload
+    
     print(f"Received telemetry from {payload.node_name}:{payload.drive_id} -> WAF {payload.waf}")
-    return {"status": "success", "recorded_waf": payload.waf, "db_size": len(telemetry_db)}
+    return {"status": "success", "recorded_waf": payload.waf}
 
 @app.get("/api/v1/models")
 def get_commercial_models():
