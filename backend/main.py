@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from backend.database import init_db, save_telemetry, get_latest_topology, get_node_history
 
 app = FastAPI(title="RedPulse Simulator API")
 
@@ -47,26 +48,28 @@ class AgentPayload(BaseModel):
     write_mbps: float
     iops: int
 
-# In-memory storage for MVP: { node_name: { drive_id: latest_payload } }
-telemetry_db = {}
+# Initialize database on module load
+init_db()
+
 
 @app.get("/api/v1/cluster/stats")
 def get_cluster_stats():
     """
     Returns aggregated metrics for the entire cluster.
     """
-    total_nodes = len(telemetry_db)
+    db_topology = get_latest_topology()
+    total_nodes = len(db_topology)
     total_disks = 0
     critical_disks = 0
     warning_disks = 0
     
-    for node, drives in telemetry_db.items():
+    for node, drives in db_topology.items():
         for drive_id, data in drives.items():
             total_disks += 1
-            # Mock logic based on WAF or health (In real life, we'd use predicted_rul)
-            if data.waf > 5.0 or data.available_spare_percent < 10:
+            # Using data['waf'] because the DB rows are dictionaries/Row objects
+            if data['waf'] > 5.0 or data['available_spare_percent'] < 10:
                 critical_disks += 1
-            elif data.waf > 3.0 or data.available_spare_percent < 30:
+            elif data['waf'] > 3.0 or data['available_spare_percent'] < 30:
                 warning_disks += 1
                 
     return {
@@ -80,14 +83,16 @@ def get_cluster_stats():
         }
     }
 
+
 @app.get("/api/v1/cluster/topology")
 def get_cluster_topology():
     """
     Returns the organized node/disk status for the cluster view cards.
     """
+    db_topology = get_latest_topology()
     topology = []
     
-    for node_id, drives in telemetry_db.items():
+    for node_id, drives in db_topology.items():
         disks = []
         max_severity = 0
         
@@ -96,9 +101,9 @@ def get_cluster_topology():
         for idx, drive_id in enumerate(sorted_drive_ids):
             data = drives[drive_id]
             severity = 0
-            if data.waf > 5.0 or data.available_spare_percent < 10:
+            if data['waf'] > 5.0 or data['available_spare_percent'] < 10:
                 severity = 2
-            elif data.waf > 3.0 or data.available_spare_percent < 30:
+            elif data['waf'] > 3.0 or data['available_spare_percent'] < 30:
                 severity = 1
                 
             if severity > max_severity:
@@ -107,10 +112,10 @@ def get_cluster_topology():
             disks.append({
                 "slot": idx + 1,
                 "drive_id": drive_id,
-                "health": 100 - (data.waf * 5), # Mock health calc for visual
+                "health": 100 - (data['waf'] * 5),
                 "severity": severity,
-                "waf": data.waf,
-                "temp": data.temperature_c
+                "waf": data['waf'],
+                "temp": data['temperature_c']
             })
             
         topology.append({
@@ -120,6 +125,14 @@ def get_cluster_topology():
         })
         
     return {"status": "success", "data": topology}
+
+@app.get("/api/v1/cluster/node/{node_name}/history")
+def get_node_telemetry_history(node_name: str):
+    """
+    Returns the historical telemetry for a specific node.
+    """
+    history = get_node_history(node_name)
+    return {"status": "success", "data": history}
 
 @app.get("/")
 def read_root():
@@ -150,12 +163,8 @@ def ingest_telemetry(payload: AgentPayload):
     """
     Endpoint for receiving real-time telemetry from on-premise agents.
     """
-    if payload.node_name not in telemetry_db:
-        telemetry_db[payload.node_name] = {}
-    
-    telemetry_db[payload.node_name][payload.drive_id] = payload
-    
-    print(f"Received telemetry from {payload.node_name}:{payload.drive_id} -> WAF {payload.waf}")
+    save_telemetry(payload)
+    print(f"Received telemetry from {payload.node_name}:{payload.drive_id} -> WAF {payload.waf} (Stored in SQLite)")
     return {"status": "success", "recorded_waf": payload.waf}
 
 @app.get("/api/v1/models")

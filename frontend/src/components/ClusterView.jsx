@@ -1,4 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import AlertPanel from './AlertPanel';
+import NodeDetailModal from './NodeDetailModal';
 
 export default function ClusterView() {
   const [stats, setStats] = useState({
@@ -8,6 +10,10 @@ export default function ClusterView() {
     warning_alerts: 0,
     overall_health: 100
   });
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterSeverity, setFilterSeverity] = useState(null); // null, 0, 1, 2
+  const [selectedNode, setSelectedNode] = useState(null);
 
   useEffect(() => {
     const fetchStats = () => {
@@ -81,11 +87,18 @@ export default function ClusterView() {
     return nodes;
   }, []);
 
-  // Sort nodes: Heaviest severity first
+  // Sort and Filter nodes
   const sortedNodes = useMemo(() => {
     const dataToUse = liveTopology.length > 0 ? liveTopology : mockClusterData;
-    return [...dataToUse].sort((a, b) => b.maxSeverity - a.maxSeverity);
-  }, [mockClusterData, liveTopology]);
+    
+    return [...dataToUse]
+      .filter(node => {
+        const matchesSearch = node.id.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSeverity = filterSeverity === null || node.maxSeverity === filterSeverity;
+        return matchesSearch && matchesSeverity;
+      })
+      .sort((a, b) => b.maxSeverity - a.maxSeverity);
+  }, [mockClusterData, liveTopology, searchTerm, filterSeverity]);
 
   const getSeverityColor = (severity) => {
     if (severity === 2) return '#dc2626'; // Critical Red
@@ -95,6 +108,8 @@ export default function ClusterView() {
 
   return (
     <div className="glass-panel" style={{ height: '100%', overflowY: 'auto', padding: '1.5rem' }}>
+       <AlertPanel nodes={liveTopology.length > 0 ? liveTopology : mockClusterData} />
+
        {/* Aggregate Stats Header */}
        <div className="stats-grid" style={{ marginBottom: '2rem', gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <div className="glass-panel stat-card" style={{ padding: '1rem', borderTop: '4px solid #111' }}>
@@ -134,14 +149,56 @@ export default function ClusterView() {
           </span>
        </h2>
        
+       {/* Filter Bar */}
+       <div style={{ display: 'flex', gap: '15px', marginBottom: '1.5rem', alignItems: 'center', background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <input 
+            type="text" 
+            placeholder="Search Node ID..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #d1d5db', width: '250px', outline: 'none' }}
+          />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+                onClick={() => setFilterSeverity(null)}
+                style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #d1d5db', background: filterSeverity === null ? '#111' : 'white', color: filterSeverity === null ? 'white' : '#111', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                ALL
+            </button>
+            <button 
+                onClick={() => setFilterSeverity(2)}
+                style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: '4px', border: 'none', background: filterSeverity === 2 ? '#dc2626' : '#fee2e2', color: filterSeverity === 2 ? 'white' : '#dc2626', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                CRITICAL
+            </button>
+            <button 
+                onClick={() => setFilterSeverity(1)}
+                style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: '4px', border: 'none', background: filterSeverity === 1 ? '#d97706' : '#ffedd5', color: filterSeverity === 1 ? 'white' : '#d97706', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                WARNING
+            </button>
+            <button 
+                onClick={() => setFilterSeverity(0)}
+                style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: '4px', border: 'none', background: filterSeverity === 0 ? '#16a34a' : '#dcfce7', color: filterSeverity === 0 ? 'white' : '#16a34a', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                HEALTHY
+            </button>
+          </div>
+       </div>
+
        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
           {sortedNodes.map(node => (
-            <div key={node.id} className="glass-panel" style={{ 
-              padding: '1.2rem', 
-              border: node.maxSeverity === 2 ? '1px solid #fca5a5' : '1px solid #e4e4e7',
-              background: node.maxSeverity === 2 ? '#fef2f2' : 'white',
-              borderRadius: '8px'
-            }}>
+            <div 
+              key={node.id} 
+              className="glass-panel" 
+              onClick={() => setSelectedNode(node)}
+              style={{ 
+                padding: '1.2rem', 
+                border: node.maxSeverity === 2 ? '1px solid #fca5a5' : '1px solid #e4e4e7',
+                background: node.maxSeverity === 2 ? '#fef2f2' : 'white',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'transform 0.1s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
                 <span style={{ fontWeight: 700, fontSize: '1rem', color: '#18181b' }}>{node.id.toUpperCase()}</span>
                 <span style={{ 
@@ -190,6 +247,13 @@ export default function ClusterView() {
             </div>
           ))}
        </div>
+
+       {selectedNode && (
+         <NodeDetailModal 
+           node={selectedNode} 
+           onClose={() => setSelectedNode(null)} 
+         />
+       )}
     </div>
   );
 }

@@ -273,7 +273,11 @@ function App() {
 
       {/* Main Dashboard Area */}
       <main>
-        {activeTab === 'single' ? <SingleNodeView t={t} /> : <ClusterView t={t} />}
+        {activeTab === 'single' ? (
+          <SingleNodeView t={t} />
+        ) : (
+          <ClusterView t={t} />
+        )}
       </main>
     </div>
   );
