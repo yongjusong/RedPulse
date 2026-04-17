@@ -12,12 +12,12 @@ import socket
 from datetime import datetime
 import random
 
-API_URL = "http://localhost:8000"
+API_BASE = "http://localhost:8085"
 
 def cmd_models():
     print("Fetching supported commercial SSD database from RedPulse...")
     try:
-        r = requests.get(f"{API_URL}/api/v1/models")
+        r = requests.get(f"{API_BASE}/api/v1/models")
         r.raise_for_status()
         data = r.json().get("data", [])
         print("\n[ Supported SSD Models ]")

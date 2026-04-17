@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 RedPulse Linux Native CLI
-Headless 환경에서 REST API를 통해 RedPulse의 PreFlight 모드를 즉시 돌려볼 수 있는 간편 래퍼 앱입니다.
+Headless 환경에서 REST API를 통해 RedPulse의 Design 모드를 즉시 돌려볼 수 있는 간편 래퍼 앱입니다.
 """
 
 import argparse
@@ -12,7 +12,7 @@ import socket
 from datetime import datetime
 import random
 
-API_URL = "http://localhost:8000"
+API_URL = "http://localhost:8085"
 
 def cmd_models():
     print("Fetching supported commercial SSD database from RedPulse...")
@@ -43,7 +43,7 @@ def cmd_simulate(args):
         res = r.json()
         
         print("\n" + "="*40)
-        print("         RedPulse PreFlight Report")
+        print("         RedPulse Design Report")
         print("="*40)
         p_days = res.get('predicted_rul_days', 0)
         p_years = p_days / 365.0

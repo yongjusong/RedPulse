@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 # Configuration
-DEFAULT_API_URL = "http://localhost:8000/api/v1/telemetry/ingest"
+DEFAULT_API_URL = "http://localhost:8085/api/v1/telemetry/ingest"
 INTERVAL_SECONDS = 10  # MVP interval for testing
 
 class AgentPayload(BaseModel):

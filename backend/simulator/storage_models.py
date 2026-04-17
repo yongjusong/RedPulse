@@ -60,18 +60,21 @@ class Hybrid_Drive:
         self.cache = DriveModel(capacity_gb=cache_size_gb, pe_cycles=50000, write_amplification_base=1.0)
         self.backend = QLC_Drive(capacity_gb=backend_capacity_gb)
         
-    def apply_write(self, write_gb: float, is_random: bool) -> Tuple[float, float]:
+    def apply_write(self, write_gb: float, is_random: bool, cache_policy: str = "write-back") -> Tuple[float, float]:
         """
         Returns (backend_waf, cache_hit_ratio)
         """
-        # simplified hit ratio model: larger cache = better random hit ratio
-        cache_ratio = self.cache.capacity_gb / self.backend.capacity_gb
-        
-        if is_random:
-            # e.g., 2.5% cache can absorb ~80% of random writes in typical hot-spot workloads
-            hit_ratio = min(0.95, cache_ratio * 40)
+        if cache_policy == "write-through":
+            hit_ratio = 0.0 # Bypasses cache write-absorption
         else:
-            hit_ratio = 0.0 # Sequential writes bypass cache or thrash it, so WAF is low anyway
+            # simplified hit ratio model: larger cache = better random hit ratio
+            cache_ratio = self.cache.capacity_gb / self.backend.capacity_gb
+            
+            if is_random:
+                # e.g., 2.5% cache can absorb ~80% of random writes in typical hot-spot workloads
+                hit_ratio = min(0.95, cache_ratio * 40)
+            else:
+                hit_ratio = 0.0 # Sequential writes bypass cache or thrash it, so WAF is low anyway
             
         # Writes hitting the cache
         cache_writes = write_gb * hit_ratio

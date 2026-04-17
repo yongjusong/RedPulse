@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import AlertPanel from './AlertPanel';
 import NodeDetailModal from './NodeDetailModal';
+import { API_URLS, fetchApi, getSeverityColor, getSeverityLabel } from '../api';
 
 export default function ClusterView() {
   const [stats, setStats] = useState({
@@ -14,34 +15,29 @@ export default function ClusterView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSeverity, setFilterSeverity] = useState(null); // null, 0, 1, 2
   const [selectedNode, setSelectedNode] = useState(null);
+  const [liveTopology, setLiveTopology] = useState([]);
 
   useEffect(() => {
-    const fetchStats = () => {
-      fetch('http://localhost:8000/api/v1/cluster/stats')
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                setStats(data.data);
-            }
-        })
-        .catch(err => console.error("Could not fetch cluster stats", err));
+    const fetchStats = async () => {
+      try {
+        const statsData = await fetchApi(API_URLS.STATS);
+        if (statsData.status === 'success') {
+          setStats(statsData.data);
+        }
 
-      fetch('http://localhost:8000/api/v1/cluster/topology')
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                setLiveTopology(data.data);
-            }
-        })
-        .catch(err => console.error("Could not fetch cluster topology", err));
+        const topologyData = await fetchApi(API_URLS.TOPOLOGY);
+        if (topologyData.status === 'success') {
+          setLiveTopology(topologyData.data);
+        }
+      } catch (err) {
+        console.error("Could not fetch cluster data", err);
+      }
     };
 
     fetchStats();
     const interval = setInterval(fetchStats, 5000);
     return () => clearInterval(interval);
   }, []);
-
-  const [liveTopology, setLiveTopology] = useState([]);
 
   // Generate 24 mock nodes, each with multiple disks (Fallback for visualization demo)
   const mockClusterData = useMemo(() => {
@@ -100,12 +96,6 @@ export default function ClusterView() {
       .sort((a, b) => b.maxSeverity - a.maxSeverity);
   }, [mockClusterData, liveTopology, searchTerm, filterSeverity]);
 
-  const getSeverityColor = (severity) => {
-    if (severity === 2) return '#dc2626'; // Critical Red
-    if (severity === 1) return '#d97706'; // Warning Orange
-    return '#16a34a'; // Healthy Green
-  };
-
   return (
     <div className="glass-panel" style={{ height: '100%', overflowY: 'auto', padding: '1.5rem' }}>
        <AlertPanel nodes={liveTopology.length > 0 ? liveTopology : mockClusterData} />
@@ -115,7 +105,7 @@ export default function ClusterView() {
           <div className="glass-panel stat-card" style={{ padding: '1rem', borderTop: '4px solid #111' }}>
             <div className="stat-label">Overall Health</div>
             <div className="stat-value" style={{ fontSize: '1.8rem', color: stats.overall_health < 80 ? '#dc2626' : '#111' }}>
-              {stats.overall_health.toFixed(1)}%
+              {(stats.overall_health || 100).toFixed(1)}%
             </div>
           </div>
           <div className="glass-panel stat-card" style={{ padding: '1rem' }}>
@@ -131,13 +121,13 @@ export default function ClusterView() {
           <div className="glass-panel stat-card" style={{ padding: '1rem', borderTop: stats.critical_alerts > 0 ? '4px solid #dc2626' : '1px solid #e4e4e7' }}>
             <div className="stat-label">Critical Alerts</div>
             <div className="stat-value" style={{ fontSize: '1.8rem', color: stats.critical_alerts > 0 ? '#dc2626' : '#111' }}>
-              {stats.critical_alerts}
+              {stats.critical_alerts || 0}
             </div>
           </div>
           <div className="glass-panel stat-card" style={{ padding: '1rem', borderTop: stats.warning_alerts > 0 ? '4px solid #d97706' : '1px solid #e4e4e7' }}>
             <div className="stat-label">Warnings</div>
             <div className="stat-value" style={{ fontSize: '1.8rem', color: stats.warning_alerts > 0 ? '#d97706' : '#111' }}>
-              {stats.warning_alerts}
+              {stats.warning_alerts || 0}
             </div>
           </div>
        </div>
@@ -205,11 +195,11 @@ export default function ClusterView() {
                   fontSize: '0.75rem', 
                   padding: '2px 8px', 
                   borderRadius: '12px', 
-                  background: node.maxSeverity === 2 ? '#dc2626' : (node.maxSeverity === 1 ? '#d97706' : '#16a34a'),
+                  background: getSeverityColor(node.maxSeverity),
                   color: 'white',
                   fontWeight: 'bold'
                 }}>
-                  {node.maxSeverity === 2 ? 'CRITICAL' : (node.maxSeverity === 1 ? 'WARNING' : 'HEALTHY')}
+                  {getSeverityLabel(node.maxSeverity)}
                 </span>
               </div>
               
@@ -250,8 +240,8 @@ export default function ClusterView() {
 
        {selectedNode && (
          <NodeDetailModal 
-           node={selectedNode} 
-           onClose={() => setSelectedNode(null)} 
+            node={selectedNode} 
+            onClose={() => setSelectedNode(null)} 
          />
        )}
     </div>

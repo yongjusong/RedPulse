@@ -7,6 +7,7 @@ COMMERCIAL_DRIVES = [
         "capacityGB": 3840,
         "tbw": 7008, 
         "dwpd": 1.0,
+        "unitPriceUSD": 450,
         "description": "Enterprise NVMe SSD for Data Centers"
     },
     {
@@ -17,6 +18,7 @@ COMMERCIAL_DRIVES = [
         "capacityGB": 1600,
         "tbw": 292000, 
         "dwpd": 100.0,
+        "unitPriceUSD": 2800,
         "description": "Ultra high endurance Optane DC SSD"
     },
     {
@@ -27,6 +29,7 @@ COMMERCIAL_DRIVES = [
         "capacityGB": 1920,
         "tbw": 5256,
         "dwpd": 1.5,
+        "unitPriceUSD": 280,
         "description": "SATA Data Center SSD"
     },
     {
@@ -37,6 +40,7 @@ COMMERCIAL_DRIVES = [
         "capacityGB": 4000,
         "tbw": 1440,
         "dwpd": 0.3,
+        "unitPriceUSD": 230,
         "description": "Client QLC SATA SSD"
     }
 ]

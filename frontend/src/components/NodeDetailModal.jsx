@@ -1,84 +1,119 @@
 import React, { useState, useEffect } from 'react';
+import { API_URLS, fetchApi } from '../api';
 
 export default function NodeDetailModal({ node, onClose }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [prediction, setPrediction] = useState(null);
 
   useEffect(() => {
-    if (node) {
-      setLoading(true);
-      fetch(`http://localhost:8000/api/v1/cluster/node/${node.id}/history`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === 'success') {
-            setHistory(data.data);
-          }
-          setLoading(false);
-        })
-        .catch(err => {
-          console.error("Error fetching node history", err);
-          setLoading(false);
-        });
-    }
-  }, [node]);
+    const loadNodeData = async () => {
+      try {
+        const histData = await fetchApi(API_URLS.NODE_HISTORY(node.id));
+        if (histData.status === 'success') {
+          setHistory(histData.data);
+        }
 
-  if (!node) return null;
+        const predData = await fetchApi(API_URLS.PREDICT_NODE(node.id));
+        if (predData.status === 'success') {
+          setPrediction(predData);
+        }
+      } catch (err) {
+        console.error("Error loading node details", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNodeData();
+  }, [node.id]);
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-       <div className="glass-panel" style={{ width: '80%', maxHeight: '80vh', overflowY: 'auto', background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e4e4e7', paddingBottom: '1rem' }}>
-             <h2 style={{ margin: 0 }}>Node Details: {node.id.toUpperCase()}</h2>
-             <button onClick={onClose} style={{ background: '#f4f4f5', border: '1px solid #d4d4d8', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Close</button>
-          </div>
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    }}>
+      <div className="glass-panel" style={{
+        width: '90%', maxWidth: '800px', maxHeight: '90vh',
+        overflowY: 'auto', padding: '2rem', position: 'relative',
+        background: 'white'
+      }}>
+        <button 
+          onClick={onClose}
+          style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+        >
+          ✕
+        </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px', marginBottom: '2rem' }}>
-             {node.disks.map(disk => (
-               <div key={disk.drive_id} style={{ padding: '10px', border: '1px solid #e4e4e7', borderRadius: '6px', background: disk.severity === 2 ? '#fef2f2' : (disk.severity === 1 ? '#fffbeb' : '#f0fdf4') }}>
-                  <div style={{ fontSize: '0.75rem', color: '#71717a' }}>Slot {disk.slot}</div>
-                  <div style={{ fontWeight: 'bold' }}>{disk.drive_id}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
-                     <span>Health: {disk.health}%</span>
-                     <span>WAF: {disk.waf}x</span>
-                  </div>
-               </div>
-             ))}
-          </div>
+        <h2 style={{ marginBottom: '1.5rem' }}>Node Intelligence: {node.id.toUpperCase()}</h2>
 
-          <h3>Telemetry History (Latest 50 events)</h3>
-          {loading ? (
-             <p>Loading history...</p>
-          ) : history.length === 0 ? (
-             <p style={{ color: '#71717a' }}>No historical telemetry found in SQLite for this node.</p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                  <thead>
-                     <tr style={{ textAlign: 'left', borderBottom: '2px solid #e4e4e7', background: '#f9fafb' }}>
-                        <th style={{ padding: '10px' }}>Timestamp</th>
-                        <th style={{ padding: '10px' }}>Disk ID</th>
-                        <th style={{ padding: '10px' }}>WAF</th>
-                        <th style={{ padding: '10px' }}>Temp</th>
-                        <th style={{ padding: '10px' }}>Spare%</th>
-                        <th style={{ padding: '10px' }}>PE Cycles</th>
-                     </tr>
-                  </thead>
-                  <tbody>
-                     {history.map((entry, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #e4e4e7' }}>
-                           <td style={{ padding: '10px' }}>{new Date(entry.timestamp).toLocaleString()}</td>
-                           <td style={{ padding: '10px', fontWeight: '500' }}>{entry.drive_id}</td>
-                           <td style={{ padding: '10px' }}>{entry.waf.toFixed(2)}x</td>
-                           <td style={{ padding: '10px' }}>{entry.temperature_c}°C</td>
-                           <td style={{ padding: '10px' }}>{entry.available_spare_percent}%</td>
-                           <td style={{ padding: '10px' }}>{entry.pe_cycles_used}</td>
-                        </tr>
-                     ))}
-                  </tbody>
-               </table>
-            </div>
-          )}
-       </div>
+        {prediction && (
+           <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem', borderLeft: '4px solid #6366f1' }}>
+              <div style={{ fontSize: '0.9rem', color: '#6366f1', fontWeight: 'bold', marginBottom: '0.5rem' }}>AI ANALYSIS RESULT</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
+                Estimated RUL: {Math.floor(prediction.predicted_rul_days / 365)} Years {Math.floor(prediction.predicted_rul_days % 365)} Days
+              </div>
+              {prediction.confidence_lower_days !== undefined && prediction.confidence_upper_days !== undefined && (
+                <div style={{ fontSize: '0.9rem', color: '#10b981', marginTop: '0.3rem', fontWeight: '500' }}>
+                  Confidence Interval (95%): {Math.floor(prediction.confidence_lower_days / 365)}y {Math.floor(prediction.confidence_lower_days % 365)}d ~ {Math.floor(prediction.confidence_upper_days / 365)}y {Math.floor(prediction.confidence_upper_days % 365)}d
+                </div>
+              )}
+              <div style={{ fontSize: '0.8rem', color: '#71717a', marginTop: '0.5rem' }}>
+                Based on {prediction.sample_points} telemetry samples collected.
+              </div>
+           </div>
+        )}
+
+        {prediction && prediction.optimal_replacement_days !== undefined && (
+           <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem', borderLeft: '4px solid #10b981', background: '#f0fdf4' }}>
+              <div style={{ fontSize: '0.9rem', color: '#10b981', fontWeight: 'bold', marginBottom: '0.5rem' }}>FINOPS AI TCO RECOMMENDATION</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#065f46' }}>
+                Optimal Replacement: {Math.floor(prediction.optimal_replacement_days / 365)}y {Math.floor(prediction.optimal_replacement_days % 365)}d from now
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#047857', marginTop: '0.5rem', fontWeight: '500' }}>
+                Estimated Savings: ${prediction.financial_savings_usd.toLocaleString()} per node
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#059669', marginTop: '0.3rem' }}>
+                Calculated by minimizing downtime risk penalty curve vs unamortized hardware residual value.
+              </div>
+           </div>
+        )}
+
+        <h3>Historical Telemetry (Last 30 Points)</h3>
+        {loading ? (
+          <div>Analyzing historical trends...</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', textAlign: 'left', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e4e4e7' }}>
+                  <th style={{ padding: '0.5rem' }}>Timestamp</th>
+                  <th style={{ padding: '0.5rem' }}>Drive</th>
+                  <th style={{ padding: '0.5rem' }}>WAF</th>
+                  <th style={{ padding: '0.5rem' }}>Temp</th>
+                  <th style={{ padding: '0.5rem' }}>Spare %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h, i) => (
+                  <tr key={h.id || i} style={{ borderBottom: '1px solid #f4f4f5' }}>
+                    <td style={{ padding: '0.5rem' }}>{h.timestamp}</td>
+                    <td style={{ padding: '0.5rem' }}>{h.drive_id}</td>
+                    <td style={{ padding: '0.5rem' }}>{h.waf.toFixed(2)}</td>
+                    <td style={{ padding: '0.5rem' }}>{h.temperature_c}°C</td>
+                    <td style={{ padding: '0.5rem' }}>{h.available_spare_percent}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

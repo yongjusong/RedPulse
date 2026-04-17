@@ -6,7 +6,9 @@ from datetime import datetime
 import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from backend.database import init_db, save_telemetry, get_latest_topology, get_node_history
+from database import init_db, save_telemetry, get_latest_topology, get_node_history
+from economics import calculate_economics, calculate_optimal_replacement
+from ai.model import predict_rul_telemetry, predict_rul_with_lstm, load_lstm_model
 
 app = FastAPI(title="RedPulse Simulator API")
 
@@ -18,6 +20,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_event():
+    print("🔥 Warming up AI Models...")
+    load_lstm_model()
+    print("✅ Models ready for inference.")
 
 # Define frontend static directory
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -35,6 +43,8 @@ class SimulationRequest(BaseModel):
     randomSequentialRatio: int # e.g. 80 (for 80/20 random/seq)
     cacheSizeGB: Optional[int] = None # For Hybrid
     modelName: Optional[str] = None # Commercial drive ID
+    customTBW: Optional[int] = 0 # In Terabytes
+    cachePolicy: Optional[str] = "write-back" # Software OS cache policy
 
 class AgentPayload(BaseModel):
     node_name: str
@@ -66,7 +76,6 @@ def get_cluster_stats():
     for node, drives in db_topology.items():
         for drive_id, data in drives.items():
             total_disks += 1
-            # Using data['waf'] because the DB rows are dictionaries/Row objects
             if data['waf'] > 5.0 or data['available_spare_percent'] < 10:
                 critical_disks += 1
             elif data['waf'] > 3.0 or data['available_spare_percent'] < 30:
@@ -84,6 +93,16 @@ def get_cluster_stats():
     }
 
 
+@app.get("/api/v1/economics/summary")
+def get_economics_summary():
+    """
+    Returns the TCO and Risk Analysis for the entire cluster.
+    """
+    topology = get_latest_topology()
+    econ_data = calculate_economics(topology)
+    return {"status": "success", "data": econ_data}
+
+
 @app.get("/api/v1/cluster/topology")
 def get_cluster_topology():
     """
@@ -96,7 +115,6 @@ def get_cluster_topology():
         disks = []
         max_severity = 0
         
-        # Sort drives by name/id for consistent slotting
         sorted_drive_ids = sorted(drives.keys())
         for idx, drive_id in enumerate(sorted_drive_ids):
             data = drives[drive_id]
@@ -126,6 +144,9 @@ def get_cluster_topology():
         
     return {"status": "success", "data": topology}
 
+def standard_response(data, status="success"):
+    return {"status": status, "data": data}
+
 @app.get("/api/v1/cluster/node/{node_name}/history")
 def get_node_telemetry_history(node_name: str):
     """
@@ -136,23 +157,15 @@ def get_node_telemetry_history(node_name: str):
 
 @app.get("/")
 def read_root():
-    """
-    Serve the main index.html for the root path.
-    """
     index_file = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
-    return {"message": "Welcome to RedPulse Simulation Engine (Frontend assets not found)"}
+    return {"message": "Welcome to RedPulse Simulation Engine"}
 
 @app.get("/{full_path:path}")
 def serve_spa(full_path: str):
-    """
-    Catch-all route to support React SPA routing.
-    """
-    # If path starts with api/, it's a 404 for API
     if full_path.startswith("api/"):
         return {"error": "Not Found"}
-    
     index_file = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
@@ -160,39 +173,28 @@ def serve_spa(full_path: str):
 
 @app.post("/api/v1/telemetry/ingest")
 def ingest_telemetry(payload: AgentPayload):
-    """
-    Endpoint for receiving real-time telemetry from on-premise agents.
-    """
     save_telemetry(payload)
-    print(f"Received telemetry from {payload.node_name}:{payload.drive_id} -> WAF {payload.waf} (Stored in SQLite)")
     return {"status": "success", "recorded_waf": payload.waf}
 
 @app.get("/api/v1/models")
 def get_commercial_models():
-    """
-    Returns a list of supported commercial SSD models.
-    """
     from simulator.vendors import COMMERCIAL_DRIVES
     return {"status": "success", "data": COMMERCIAL_DRIVES}
 
 @app.post("/simulate")
 def run_simulation(req: SimulationRequest):
-    """
-    Mode 1: Virtual Simulation Engine
-    """
     from simulator.engine import run_simulation_engine
-    
     random_ratio = req.randomSequentialRatio / 100.0
-    
     result = run_simulation_engine(
         drive_type=req.driveType,
         capacity_gb=req.capacityGB,
         daily_writes_gb=req.dailyWritesGB,
         random_ratio=random_ratio,
         cache_size_gb=req.cacheSizeGB or 0,
-        model_name=req.modelName
+        model_name=req.modelName,
+        custom_tbw=req.customTBW or 0,
+        cache_policy=req.cachePolicy
     )
-    
     return result
 
 class TelemetryRequest(BaseModel):
@@ -207,17 +209,11 @@ class TelemetryRequest(BaseModel):
 
 @app.post("/extrapolate")
 def run_extrapolation(req: TelemetryRequest):
-    """
-    Mode 2: ML-based Telemetry Extrapolation
-    """
-    from ai.model import predict_rul_telemetry
-    
-    random_ratio = req.randomSequentialRatio / 100.0
     predicted_rul = predict_rul_telemetry(
         drive_type=req.driveType,
         capacity_gb=req.capacityGB,
         writes_gb=req.dailyWritesGB,
-        rand_ratio=random_ratio,
+        rand_ratio=req.randomSequentialRatio / 100.0,
         cache_size_gb=req.cacheSizeGB or 0,
         waf=req.observed_waf,
         hit_ratio=req.observed_hit_ratio
@@ -225,14 +221,13 @@ def run_extrapolation(req: TelemetryRequest):
     
     # Generate an extrapolated time series for the UI
     time_series = []
-    # Simple linear degradation based on ML prediction for the UI visualization
-    years = predicted_rul / 365
+    years = max(0.1, predicted_rul / 365)
     points = 10
     days_step = predicted_rul / points
     
     for i in range(points + 1):
         day = int(i * days_step)
-        health = max(0, 100 - (100 / predicted_rul) * day)
+        health = max(0, 100 - (100 / (predicted_rul or 1)) * day)
         time_series.append({"day": day, "health_percent": round(health, 2)})
         
     return {
@@ -242,5 +237,57 @@ def run_extrapolation(req: TelemetryRequest):
             "average_waf": req.observed_waf,
             "cache_hit_ratio": req.observed_hit_ratio
         },
+        "time_series_data": time_series
+    }
+
+@app.get("/api/v1/cluster/node/{node_name}/predict")
+def predict_node_life_with_lstm(node_name: str, lookback: int = 30):
+    """
+    Predicts the life of a node using LSTM.
+    'lookback' defines how many recent telemetry samples to consider.
+    """
+    history = get_node_history(node_name, limit=lookback)
+    if not history:
+        return {"status": "error", "message": "No history found for node"}
+    
+    subject_disk = history[0]['drive_id']
+    sequence = []
+    
+    disk_history = [h for h in history if h['drive_id'] == subject_disk]
+    disk_history.sort(key=lambda x: x['timestamp'])
+    
+    for entry in disk_history:
+        sequence.append([entry['waf'], 0.5]) # hit_ratio mock
+        
+    predicted_rul = predict_rul_with_lstm(sequence)
+    
+    # Calculate Confidence Interval (Uncertainty)
+    # The fewer samples we have, the higher the uncertainty (between 5% and 30%)
+    uncertainty_factor = min(0.30, max(0.05, 1.0 / max(1, len(sequence))))
+    lower_bound_days = max(0, predicted_rul * (1.0 - uncertainty_factor))
+    upper_bound_days = predicted_rul * (1.0 + uncertainty_factor)
+    
+    # Generate an extrapolated time series for the UI
+    time_series = []
+    points = 10
+    days_step = predicted_rul / points
+    for i in range(points + 1):
+        day = int(i * days_step)
+        health = max(0, 100 - (100 / (predicted_rul or 1)) * day)
+        time_series.append({"day": day, "health_percent": round(health, 2)})
+
+    # Calculate Optimal Replacement (TCO FinOps)
+    finops_data = calculate_optimal_replacement(predicted_rul, subject_disk, 4000)
+
+    return {
+        "status": "success",
+        "predicted_rul_days": int(predicted_rul),
+        "confidence_lower_days": int(lower_bound_days),
+        "confidence_upper_days": int(upper_bound_days),
+        "optimal_replacement_days": finops_data["optimal_replacement_days"],
+        "financial_savings_usd": finops_data["financial_savings_usd"],
+        "node_name": node_name,
+        "drive_id": subject_disk,
+        "sample_points": len(sequence),
         "time_series_data": time_series
     }
