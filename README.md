@@ -1,6 +1,6 @@
 # RedPulse (레드펄스) - AI-Based SSD Lifespan Simulator
 
-![RedPulse Dashboard](docs/dashboard_v2.png)
+![RedPulse Dashboard](docs/simulator_preflight.png)
 
 RedPulse는 물리적인 자원과 시간을 소비하지 않고, 인공지능(AI)과 가상 시뮬레이션을 통해 다양한 스토리지 구성(TLC, QLC, Hybrid)의 **잔여 수명(RUL, Remaining Useful Life)**을 단 몇 초 만에 예측해내는 웹 기반 대시보드 도구입니다.
 
@@ -25,6 +25,22 @@ RedPulse 시뮬레이터는 사용자의 기획 단계와 검증 단계에 맞�
 - **디바이스 토폴로지 설정**: 순수 고내구성(TLC), 고용량(QLC), 하이브리드(SLC+QLC) 방식 지원.
 - **데이터 분석 및 매핑**: (LiveOps 구동 시) 사용자 환경의 실제 서버 텔레메트리 데이터를 수집하여 AI 기반 궤적 보정.
 - **다중 노드 클러스터 대시보드**: 수백 대의 노드와 디스크 베이 상태를 한눈에 모니터링하는 엔터프라이즈 모니터링.
+
+---
+
+## 📸 플랫폼 주요 화면 (Screenshots)
+
+### 1. 시뮬레이터 및 실시간 수명 예측 (PreFlight / LiveOps)
+![Simulator & Prediction](docs/simulator_preflight.png)
+
+### 2. 엔터프라이즈 클러스터 모니터링 (Cluster Grid)
+![Cluster Grid](docs/cluster_grid.png)
+
+### 3. TCO 및 FinOps 리스크 관리 (Impact)
+![FinOps Impact](docs/finops_impact.png)
+
+### 4. 자동화된 경영진 리포트 (Executive Report)
+![Executive Report](docs/executive_report.png)
 
 ---
 

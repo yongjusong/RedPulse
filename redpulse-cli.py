@@ -36,9 +36,9 @@ def cmd_simulate(args):
         "randomSequentialRatio": args.random_ratio,
         "cacheSizeGB": args.cache
     }
-    print(f"Deploying PreFlight logic to {API_URL}/simulate ...")
+    print(f"Deploying PreFlight logic to {API_BASE}/simulate ...")
     try:
-        r = requests.post(f"{API_URL}/simulate", json=payload)
+        r = requests.post(f"{API_BASE}/simulate", json=payload)
         r.raise_for_status()
         res = r.json()
         
@@ -60,7 +60,7 @@ def cmd_report(args):
     interval = args.interval
     
     print(f"Starting RedPulse Agent on node: {node_name}")
-    print(f"Reporting to: {API_URL}")
+    print(f"Reporting to: {API_BASE}")
     print(f"Interval: {interval} seconds")
     
     # Mocking device discovery: in real world, use smartctl/lsblk
@@ -83,7 +83,7 @@ def cmd_report(args):
                 }
                 
                 try:
-                    r = requests.post(f"{API_URL}/api/v1/telemetry/ingest", json=payload)
+                    r = requests.post(f"{API_BASE}/api/v1/telemetry/ingest", json=payload)
                     r.raise_for_status()
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Reported {drive} health to server.")
                 except Exception as e:
@@ -122,5 +122,7 @@ if __name__ == '__main__':
         cmd_models()
     elif args.command == "simulate":
         cmd_simulate(args)
+    elif args.command == "report":
+        cmd_report(args)
     else:
         parser.print_help()
