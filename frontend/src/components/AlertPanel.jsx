@@ -27,12 +27,12 @@ export default function AlertPanel({ nodes }) {
        <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid #fecaca', color: '#991b1b' }}>
-                <th style={{ padding: '8px' }}>Node ID</th>
-                <th style={{ padding: '8px' }}>Slot</th>
-                <th style={{ padding: '8px' }}>Health</th>
-                <th style={{ padding: '8px' }}>WAF</th>
-                <th style={{ padding: '8px' }}>Status</th>
+              <tr style={{ textAlign: 'left', color: '#991b1b' }}>
+                <th style={{ padding: '8px', borderBottom: '1px solid #fecaca', position: 'sticky', top: 0, background: '#fff1f2', zIndex: 1 }}>Node ID</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #fecaca', position: 'sticky', top: 0, background: '#fff1f2', zIndex: 1 }}>Slot</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #fecaca', position: 'sticky', top: 0, background: '#fff1f2', zIndex: 1 }}>Health</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #fecaca', position: 'sticky', top: 0, background: '#fff1f2', zIndex: 1 }}>WAF</th>
+                <th style={{ padding: '8px', borderBottom: '1px solid #fecaca', position: 'sticky', top: 0, background: '#fff1f2', zIndex: 1 }}>Status</th>
               </tr>
             </thead>
             <tbody>

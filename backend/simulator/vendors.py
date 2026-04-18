@@ -1,5 +1,27 @@
 COMMERCIAL_DRIVES = [
     {
+        "id": "samsung_pm1743_7_68tb",
+        "vendor": "Samsung",
+        "modelName": "PM1743",
+        "type": "TLC",
+        "capacityGB": 7680,
+        "tbw": 14016, 
+        "dwpd": 1.0,
+        "unitPriceUSD": 1100,
+        "description": "PCIe 5.0 NVMe Enterprise SSD (TLC)"
+    },
+    {
+        "id": "samsung_bm1743_15_36tb",
+        "vendor": "Samsung",
+        "modelName": "BM1743",
+        "type": "QLC",
+        "capacityGB": 15360,
+        "tbw": 7288, 
+        "dwpd": 0.26,
+        "unitPriceUSD": 1400,
+        "description": "PCIe 5.0 NVMe Value Enterprise SSD (QLC)"
+    },
+    {
         "id": "samsung_pm9a3_3_84tb",
         "vendor": "Samsung",
         "modelName": "PM9A3",

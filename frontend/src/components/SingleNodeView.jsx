@@ -21,6 +21,9 @@ export default function SingleNodeView({ t }) {
           <div className="stat-value">
             {(results.predicted_rul_days / 365).toFixed(1)} <span style={{fontSize: '1rem'}}>{t.years}</span>
           </div>
+          <div style={{fontSize: '0.85rem', color: '#10b981', marginTop: '0.5rem', fontWeight: 'bold'}}>
+            Target EoL: {new Date(Date.now() + results.predicted_rul_days * 24 * 60 * 60 * 1000).toLocaleDateString()}
+          </div>
         </div>
         <div className="glass-panel stat-card">
           <div className="stat-label">{t.avgWaf}</div>

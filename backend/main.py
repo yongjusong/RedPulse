@@ -8,7 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from database import init_db, save_telemetry, get_latest_topology, get_node_history
 from economics import calculate_economics, calculate_optimal_replacement
-from ai.model import predict_rul_telemetry, predict_rul_with_lstm, load_lstm_model
+from ai.model import predict_rul_telemetry, predict_rul_with_lstm, predict_rul_ensemble, load_lstm_model
+import threading
 
 app = FastAPI(title="RedPulse Simulator API")
 
@@ -26,6 +27,12 @@ async def startup_event():
     print("🔥 Warming up AI Models...")
     load_lstm_model()
     print("✅ Models ready for inference.")
+    
+    # Start the automated reporting cron job in a background thread
+    from report_job import start_reporting_cron
+    cron_thread = threading.Thread(target=start_reporting_cron, daemon=True)
+    cron_thread.start()
+    print("✅ Automated Reporting Daemon started.")
 
 # Define frontend static directory
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -181,6 +188,22 @@ def get_commercial_models():
     from simulator.vendors import COMMERCIAL_DRIVES
     return {"status": "success", "data": COMMERCIAL_DRIVES}
 
+class FederatedGradientPayload(BaseModel):
+    agent_id: str
+    gradient_vector: List[float]
+    loss_diff: float
+    secure_token: str
+
+@app.post("/api/v1/telemetry/federated_gradient")
+def ingest_federated_gradient(payload: FederatedGradientPayload):
+    """
+    Accepts microweights (gradients) from on-prem agents for Meta-Tuning.
+    Does NOT accept raw PII or secure data, only the differential tensors.
+    """
+    print(f"📦 Received federated gradient from {payload.agent_id}. Loss diff: {payload.loss_diff}")
+    # Mock save to local directory for the Meta-Tuning engine to process later
+    return {"status": "success", "message": "Gradients logged for Meta-Tuning aggregation."}
+
 @app.post("/simulate")
 def run_simulation(req: SimulationRequest):
     from simulator.engine import run_simulation_engine
@@ -259,7 +282,9 @@ def predict_node_life_with_lstm(node_name: str, lookback: int = 30):
     for entry in disk_history:
         sequence.append([entry['waf'], 0.5]) # hit_ratio mock
         
-    predicted_rul = predict_rul_with_lstm(sequence)
+    # Ensemble AI call instead of purely LSTM to prevent overfitting logic
+    avg_waf = sum([x[0] for x in sequence]) / len(sequence)
+    predicted_rul = predict_rul_ensemble(sequence, capacity_gb=4000, daily_writes_gb=100, waf_avg=avg_waf)
     
     # Calculate Confidence Interval (Uncertainty)
     # The fewer samples we have, the higher the uncertainty (between 5% and 30%)

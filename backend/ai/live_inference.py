@@ -75,3 +75,26 @@ def predict_rul_telemetry(drive_type, capacity_gb, writes_gb, rand_ratio, cache_
     """Legacy compatibility wrapper"""
     sequence = [[waf, hit_ratio]] * 30
     return predict_rul_with_lstm(sequence)
+
+def predict_rul_ensemble(sequence: list, capacity_gb: int, daily_writes_gb: int, waf_avg: float) -> float:
+    """
+    Ensemble Model: Combine LSTM Deep Learning (70%) with a Deterministic Physical Fallback (30%)
+    to prevent DL overfitting or catastrophic outliers.
+    """
+    dl_days = predict_rul_with_lstm(sequence)
+    
+    # Deterministic Mock RandomForest / Rule-based
+    # P/E limit approx 3000 for TLC
+    actual_daily_writes = daily_writes_gb * max(1.0, waf_avg)
+    if actual_daily_writes <= 0:
+        actual_daily_writes = 0.1
+    # total lifespan days = (capacity * PE limit) / daily
+    deterministic_days = (capacity_gb * 3000) / actual_daily_writes
+    
+    # Cap deterministic anomalies
+    deterministic_days = min(3650, deterministic_days) # Cap at 10 years
+    
+    # Blend outputs
+    ensemble_days = (dl_days * 0.70) + (deterministic_days * 0.30)
+    
+    return int(ensemble_days)

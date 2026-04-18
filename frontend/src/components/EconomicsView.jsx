@@ -26,7 +26,14 @@ export default function EconomicsView() {
 
   return (
     <div style={{ padding: '1rem' }}>
-      <h1 style={{ marginBottom: '2rem' }}>💰 TCO & Economic Impact Analysis</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+          <h1 style={{ margin: 0 }}>💰 TCO & Economic Impact Analysis</h1>
+          <button 
+             onClick={() => window.open('/reports/latest_executive_report.html', '_blank')}
+             style={{ padding: '0.8rem 1.5rem', background: '#111', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+             📄 Download Executive Report (Auto-Generated)
+          </button>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
         <div className="glass-panel" style={{ padding: '1.5rem', borderLeft: '5px solid #3b82f6' }}>

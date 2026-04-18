@@ -7,6 +7,7 @@ from .live_inference import (
     load_lstm_model,
     predict_rul_with_lstm,
     predict_rul_telemetry,
+    predict_rul_ensemble,
     SSDLifeLSTM
 )
 

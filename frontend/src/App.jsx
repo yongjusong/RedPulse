@@ -82,6 +82,7 @@ function App() {
 
   const { mode, setMode, config, setConfig, results, setResults, loading, setLoading, activeTab, setTab } = useAppStore();
   const [vendors, setVendors] = useState([]);
+  const [searchString, setSearchString] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [useCustomSpec, setUseCustomSpec] = useState(false);
   
@@ -90,6 +91,18 @@ function App() {
       .then(data => {
         if (data.status === 'success') {
           setVendors(data.data);
+          // Pre-fill default Samsung PM1743 for Scenario 1 fast testing
+          if (data.data.length > 0 && !config.modelName) {
+             const defaultModel = data.data.find(v => v.modelName === 'PM1743' || v.modelName === 'BM1743' || v.vendor === 'Samsung') || data.data[0];
+             const displayStr = `[${defaultModel.vendor}] ${defaultModel.modelName} (TBW: ${defaultModel.tbw})`;
+             setSearchString(displayStr);
+             setConfig({
+                 modelName: defaultModel.id, 
+                 capacityGB: defaultModel.capacityGB || 7680, 
+                 dailyWritesGB: 1000, // Appropriate for enterprise workloads
+                 randomSequentialRatio: 80 
+             });
+          }
         }
       })
       .catch(err => console.error("Could not load vendor models", err));
@@ -164,7 +177,10 @@ function App() {
           <>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
               <button style={{flex: 1, padding: '0.5rem', background: mode === 'Design' ? '#111' : '#f4f4f5', color: mode === 'Design' ? 'white' : 'black', borderRadius: '4px', fontWeight: 'bold'}} onClick={() => setMode('Design')}>{t.virtualMode}</button>
-              <button style={{flex: 1, padding: '0.5rem', background: mode === 'Predictor' ? '#111' : '#f4f4f5', color: mode === 'Predictor' ? 'white' : 'black', borderRadius: '4px', fontWeight: 'bold'}} onClick={() => setMode('Predictor')}>{t.telemetryMode}</button>
+              <button style={{flex: 1, padding: '0.5rem', background: mode === 'Predictor' ? '#111' : '#f4f4f5', color: mode === 'Predictor' ? 'white' : 'black', borderRadius: '4px', fontWeight: 'bold', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => setMode('Predictor')}>
+                 {t.telemetryMode} 
+                 <span style={{fontSize: '0.65rem', fontWeight: 'normal', color: mode === 'Predictor' ? '#a1a1aa' : '#71717a'}}>(단일 노드 점검 시나리오)</span>
+              </button>
             </div>
       
         <h2 style={{fontSize: '1.1rem', marginBottom: '1.2rem'}}>{mode === 'Design' ? t.configTitleV : t.configTitleT}</h2>
@@ -172,18 +188,34 @@ function App() {
         {mode === 'Design' && (
           <div className="form-group">
             <label>{t.vendorModel}</label>
-            <select className="form-control" value={useCustomSpec ? "custom" : config.modelName} onChange={(e) => {
-              if (e.target.value === "custom") {
-                setUseCustomSpec(true);
-              } else {
-                setUseCustomSpec(false);
-                setConfig({modelName: e.target.value});
-              }
-            }}>
-              <option value="">{t.genericCustom}</option>
-              <option value="custom">✨ {t.customSpec}</option>
-              {vendors.map(v => <option key={v.id} value={v.id}>{v.vendor} {v.modelName}</option>)}
-            </select>
+            <input 
+              type="text"
+              className="form-control" 
+              placeholder="Search Vendor, Model, or TBW..."
+              list="vendor-opts"
+              value={searchString}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSearchString(val);
+                if (val.includes("custom")) {
+                  setUseCustomSpec(true);
+                  setConfig({modelName: null});
+                } else {
+                  const match = vendors.find(v => `[${v.vendor}] ${v.modelName} (TBW: ${v.tbw})` === val);
+                  if (match) {
+                    setUseCustomSpec(false);
+                    setConfig({modelName: match.id});
+                  } else if (val === '') {
+                    setUseCustomSpec(false);
+                    setConfig({modelName: null});
+                  }
+                }
+              }}
+            />
+            <datalist id="vendor-opts">
+               <option value="custom">✨ {t.customSpec}</option>
+               {vendors.map(v => <option key={v.id} value={`[${v.vendor}] ${v.modelName} (TBW: ${v.tbw})`} />)}
+            </datalist>
           </div>
         )}
 
