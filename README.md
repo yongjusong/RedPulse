@@ -36,10 +36,13 @@ RedPulse 시뮬레이터는 사용자의 기획 단계와 검증 단계에 맞�
 ### 2. 엔터프라이즈 클러스터 모니터링 (Cluster Grid)
 ![Cluster Grid](docs/cluster_grid.png)
 
-### 3. TCO 및 FinOps 리스크 관리 (Impact)
+### 3. 특정 노드 및 개별 드라이브 AI 분석 (Node Detail)
+![Node & Drive Detail](docs/node_detail.png)
+
+### 4. TCO 및 FinOps 리스크 관리 (Impact)
 ![FinOps Impact](docs/finops_impact.png)
 
-### 4. 자동화된 경영진 리포트 (Executive Report)
+### 5. 자동화된 경영진 리포트 (Executive Report)
 ![Executive Report](docs/executive_report.png)
 
 ---
