@@ -6,7 +6,7 @@ from datetime import datetime
 import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from database import init_db, save_telemetry, get_latest_topology, get_node_history
+from database import init_db, save_telemetry, get_latest_topology, get_node_history, get_node_drives
 from economics import calculate_economics, calculate_optimal_replacement
 from ai.model import predict_rul_telemetry, predict_rul_with_lstm, predict_rul_ensemble, load_lstm_model
 import threading
@@ -155,28 +155,22 @@ def standard_response(data, status="success"):
     return {"status": status, "data": data}
 
 @app.get("/api/v1/cluster/node/{node_name}/history")
-def get_node_telemetry_history(node_name: str):
+def get_node_telemetry_history(node_name: str, drive: str = None):
     """
-    Returns the historical telemetry for a specific node.
+    Returns the historical telemetry for a specific node and an optional drive.
     """
-    history = get_node_history(node_name)
+    history = get_node_history(node_name, drive_id=drive)
     return {"status": "success", "data": history}
 
-@app.get("/")
-def read_root():
-    index_file = os.path.join(FRONTEND_DIR, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    return {"message": "Welcome to RedPulse Simulation Engine"}
+@app.get("/api/v1/cluster/node/{node_name}/drives")
+def get_node_drives_endpoint(node_name: str):
+    """
+    Returns distinct drive IDs mounted on a specific node.
+    """
+    drives = get_node_drives(node_name)
+    return {"status": "success", "data": drives}
 
-@app.get("/{full_path:path}")
-def serve_spa(full_path: str):
-    if full_path.startswith("api/"):
-        return {"error": "Not Found"}
-    index_file = os.path.join(FRONTEND_DIR, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    return {"error": "Frontend assets not found"}
+
 
 @app.post("/api/v1/telemetry/ingest")
 def ingest_telemetry(payload: AgentPayload):
@@ -187,6 +181,60 @@ def ingest_telemetry(payload: AgentPayload):
 def get_commercial_models():
     from simulator.vendors import COMMERCIAL_DRIVES
     return {"status": "success", "data": COMMERCIAL_DRIVES}
+
+class NewModelRequest(BaseModel):
+    vendor: str
+    modelName: str
+    type: str
+    capacityGB: int
+    tbw: int
+
+@app.post("/api/v1/models")
+def add_commercial_model(req: NewModelRequest):
+    from simulator.vendors import COMMERCIAL_DRIVES
+    
+    new_id = f"{req.vendor.lower().replace(' ', '_')}_{req.modelName.lower().replace(' ', '_')}_{req.capacityGB}gb"
+    
+    new_model = {
+        "id": new_id,
+        "vendor": req.vendor,
+        "modelName": req.modelName,
+        "type": req.type,
+        "capacityGB": req.capacityGB,
+        "tbw": req.tbw,
+        "dwpd": round(req.tbw * 1000 / (req.capacityGB * 365 * 5), 2), # Approx DWPD calculation
+        "unitPriceUSD": 0,
+        "description": "User Custom Defined Model"
+    }
+    COMMERCIAL_DRIVES.append(new_model)
+    return {"status": "success", "data": new_model}
+
+@app.put("/api/v1/models/{model_id}")
+def update_commercial_model(model_id: str, req: NewModelRequest):
+    from simulator.vendors import COMMERCIAL_DRIVES
+    for entry in COMMERCIAL_DRIVES:
+        if entry["id"] == model_id:
+            entry["vendor"] = req.vendor
+            entry["modelName"] = req.modelName
+            entry["type"] = req.type
+            entry["capacityGB"] = req.capacityGB
+            entry["tbw"] = req.tbw
+            entry["dwpd"] = round(req.tbw * 1000 / (req.capacityGB * 365 * 5), 2)
+            return {"status": "success", "data": entry}
+    return {"status": "error", "message": "Model not found"}
+
+@app.delete("/api/v1/models/{model_id}")
+def delete_commercial_model(model_id: str):
+    from simulator.vendors import COMMERCIAL_DRIVES
+    target = None
+    for idx, entry in enumerate(COMMERCIAL_DRIVES):
+        if entry["id"] == model_id:
+            target = idx
+            break
+    if target is not None:
+        COMMERCIAL_DRIVES.pop(target)
+        return {"status": "success"}
+    return {"status": "error", "message": "Model not found"}
 
 class FederatedGradientPayload(BaseModel):
     agent_id: str
@@ -264,16 +312,17 @@ def run_extrapolation(req: TelemetryRequest):
     }
 
 @app.get("/api/v1/cluster/node/{node_name}/predict")
-def predict_node_life_with_lstm(node_name: str, lookback: int = 30):
+def predict_node_life_with_lstm(node_name: str, lookback: int = 30, drive: str = None):
     """
     Predicts the life of a node using LSTM.
     'lookback' defines how many recent telemetry samples to consider.
+    'drive' filters telemetry to a specific SSD drive.
     """
-    history = get_node_history(node_name, limit=lookback)
+    history = get_node_history(node_name, drive_id=drive, limit=lookback)
     if not history:
-        return {"status": "error", "message": "No history found for node"}
+        return {"status": "error", "message": "No history found for node/drive"}
     
-    subject_disk = history[0]['drive_id']
+    subject_disk = drive if drive else history[0]['drive_id']
     sequence = []
     
     disk_history = [h for h in history if h['drive_id'] == subject_disk]
@@ -313,6 +362,21 @@ def predict_node_life_with_lstm(node_name: str, lookback: int = 30):
         "financial_savings_usd": finops_data["financial_savings_usd"],
         "node_name": node_name,
         "drive_id": subject_disk,
-        "sample_points": len(sequence),
         "time_series_data": time_series
     }
+
+@app.get("/")
+def read_root():
+    index_file = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"message": "Welcome to RedPulse Simulation Engine"}
+
+@app.get("/{full_path:path}")
+def serve_spa(full_path: str):
+    if full_path.startswith("api/"):
+        return {"error": "Not Found"}
+    index_file = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"error": "Frontend assets not found"}

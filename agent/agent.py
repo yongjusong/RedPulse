@@ -5,6 +5,7 @@ import random
 import requests
 import argparse
 import subprocess
+import socket
 from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional
@@ -51,8 +52,11 @@ class OSMetricCollector:
         if random.random() > 0.95:
             self.mock_spare = max(0, self.mock_spare - 1)
             
+        # 호스트 OS의 실제 머신 이름(Hostname)을 동적으로 가져옵니다.
+        current_hostname = socket.gethostname()
+            
         return AgentPayload(
-            node_name="mock-server-01",
+            node_name=current_hostname,
             drive_id=self.drive_id,
             timestamp=datetime.utcnow().isoformat() + "Z",
             waf=self.mock_waf,

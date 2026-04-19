@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import AlertPanel from './AlertPanel';
-import NodeDetailModal from './NodeDetailModal';
 import { API_URLS, fetchApi, getSeverityColor, getSeverityLabel } from '../api';
+import useAppStore from '../store';
 
 export default function ClusterView() {
+  const jumpToPredictor = useAppStore(state => state.jumpToPredictor);
   const [stats, setStats] = useState({
     total_nodes: 0,
     total_disks: 0,
@@ -97,36 +98,36 @@ export default function ClusterView() {
   }, [mockClusterData, liveTopology, searchTerm, filterSeverity]);
 
   return (
-    <div className="glass-panel" style={{ height: '100%', overflowY: 'auto', padding: '1.5rem' }}>
+    <div className="eng-panel" style={{ height: '100%', overflowY: 'auto', padding: '1rem', borderTop: 'none', borderRight: 'none', borderBottom: 'none' }}>
        <AlertPanel nodes={liveTopology.length > 0 ? liveTopology : mockClusterData} />
 
        {/* Aggregate Stats Header */}
-       <div className="stats-grid" style={{ marginBottom: '2rem', gridTemplateColumns: 'repeat(4, 1fr)' }}>
-          <div className="glass-panel stat-card" style={{ padding: '1rem', borderTop: '4px solid #111' }}>
+       <div className="stats-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div className="stat-card" style={{ padding: '0.85rem', borderTop: '3px solid #111' }}>
             <div className="stat-label">Overall Health</div>
-            <div className="stat-value" style={{ fontSize: '1.8rem', color: stats.overall_health < 80 ? '#dc2626' : '#111' }}>
+            <div className="stat-value" style={{ color: stats.overall_health < 80 ? '#dc2626' : '#111' }}>
               {(stats.overall_health || 100).toFixed(1)}%
             </div>
           </div>
-          <div className="glass-panel stat-card" style={{ padding: '1rem' }}>
+          <div className="stat-card" style={{ padding: '0.85rem' }}>
             <div className="stat-label">Inventory</div>
-            <div className="stat-value" style={{ fontSize: '1.8rem' }}>
+            <div className="stat-value">
                 <span title="Nodes">{stats.total_nodes || 24}</span>
-                <span style={{ fontSize: '1rem', color: '#71717a', marginLeft: '8px' }}>N</span>
-                <span style={{ margin: '0 8px', color: '#e4e4e7' }}>|</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginLeft: '4px' }}>N</span>
+                <span style={{ margin: '0 8px', color: 'var(--border-color)', fontWeight: 'normal' }}>|</span>
                 <span title="Disks">{stats.total_disks || 384}</span>
-                <span style={{ fontSize: '1rem', color: '#71717a', marginLeft: '4px' }}>D</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginLeft: '4px' }}>D</span>
             </div>
           </div>
-          <div className="glass-panel stat-card" style={{ padding: '1rem', borderTop: stats.critical_alerts > 0 ? '4px solid #dc2626' : '1px solid #e4e4e7' }}>
+          <div className="stat-card" style={{ padding: '0.85rem', borderTop: stats.critical_alerts > 0 ? '3px solid #dc2626' : '3px solid transparent' }}>
             <div className="stat-label">Critical Alerts</div>
-            <div className="stat-value" style={{ fontSize: '1.8rem', color: stats.critical_alerts > 0 ? '#dc2626' : '#111' }}>
+            <div className="stat-value" style={{ color: stats.critical_alerts > 0 ? '#dc2626' : '#111' }}>
               {stats.critical_alerts || 0}
             </div>
           </div>
-          <div className="glass-panel stat-card" style={{ padding: '1rem', borderTop: stats.warning_alerts > 0 ? '4px solid #d97706' : '1px solid #e4e4e7' }}>
+          <div className="stat-card" style={{ padding: '0.85rem', borderTop: stats.warning_alerts > 0 ? '3px solid #d97706' : '3px solid transparent' }}>
             <div className="stat-label">Warnings</div>
-            <div className="stat-value" style={{ fontSize: '1.8rem', color: stats.warning_alerts > 0 ? '#d97706' : '#111' }}>
+            <div className="stat-value" style={{ color: stats.warning_alerts > 0 ? '#d97706' : '#111' }}>
               {stats.warning_alerts || 0}
             </div>
           </div>
@@ -140,7 +141,7 @@ export default function ClusterView() {
        </h2>
        
        {/* Filter Bar */}
-       <div style={{ display: 'flex', gap: '15px', marginBottom: '1.5rem', alignItems: 'center', background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+       <div style={{ display: 'flex', gap: '15px', marginBottom: '1.5rem', alignItems: 'center', background: '#f8fafc', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '2px' }}>
           <input 
             type="text" 
             placeholder="Search Node ID..." 
@@ -172,32 +173,26 @@ export default function ClusterView() {
           </div>
        </div>
 
-       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1px', background: 'var(--border-color)', border: '1px solid var(--border-color)' }}>
           {sortedNodes.map(node => (
             <div 
               key={node.id} 
-              className="glass-panel" 
-              onClick={() => setSelectedNode(node)}
+              onClick={() => jumpToPredictor(node.id)}
               style={{ 
-                padding: '1.2rem', 
-                border: node.maxSeverity === 2 ? '1px solid #fca5a5' : '1px solid #e4e4e7',
-                background: node.maxSeverity === 2 ? '#fef2f2' : 'white',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                transition: 'transform 0.1s'
+                padding: '1rem', 
+                background: node.maxSeverity === 2 ? '#fef2f2' : (node.maxSeverity === 1 ? '#fff7ed' : '#ffffff'),
+                cursor: 'pointer'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '1rem', color: '#18181b' }}>{node.id.toUpperCase()}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <span className="mono-text" style={{ fontWeight: 600, fontSize: '0.9rem', color: '#18181b' }}>{node.id.toUpperCase()}</span>
                 <span style={{ 
-                  fontSize: '0.75rem', 
-                  padding: '2px 8px', 
-                  borderRadius: '12px', 
+                  fontSize: '0.65rem', 
+                  padding: '2px 6px', 
+                  borderRadius: '2px', 
                   background: getSeverityColor(node.maxSeverity),
                   color: 'white',
-                  fontWeight: 'bold'
+                  fontWeight: '600'
                 }}>
                   {getSeverityLabel(node.maxSeverity)}
                 </span>
@@ -206,23 +201,24 @@ export default function ClusterView() {
               <div style={{ 
                 display: 'grid', 
                 gridTemplateColumns: `repeat(${node.disks.length === 24 ? 8 : (node.disks.length === 16 ? 8 : 6)}, 1fr)`, 
-                gap: '6px' 
+                gap: '2px' 
               }}>
                 {node.disks.map(disk => (
                   <div 
                     key={`${node.id}-slot-${disk.slot}`}
+                    className="mono-text"
                     style={{
                       aspectRatio: '1/1',
                       background: getSeverityColor(disk.severity),
-                      borderRadius: '3px',
+                      borderRadius: '1px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.65rem',
+                      fontSize: '0.6rem',
                       color: 'white',
-                      fontWeight: 'bold',
+                      fontWeight: '500',
                       cursor: 'help',
-                      opacity: disk.severity === 0 ? 0.8 : 1
+                      opacity: disk.severity === 0 ? 0.7 : 1
                     }}
                     title={`Slot ${disk.slot}\nHealth: ${disk.health}%\nWAF: ${disk.waf}\nTemp: ${disk.temp}°C`}
                   >
@@ -230,20 +226,13 @@ export default function ClusterView() {
                   </div>
                 ))}
               </div>
-              <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#71717a', display: 'flex', justifyContent: 'space-between' }}>
-                <span>{node.disks.length} Bays Array</span>
-                <span style={{ cursor: 'pointer', textDecoration: 'underline' }}>Node Detail →</span>
+              <div style={{ marginTop: '0.8rem', fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                <span>{node.disks.length}-Bay Topology</span>
+                <span style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--accent-base)' }}>View Trace</span>
               </div>
             </div>
           ))}
        </div>
-
-       {selectedNode && (
-         <NodeDetailModal 
-            node={selectedNode} 
-            onClose={() => setSelectedNode(null)} 
-         />
-       )}
     </div>
   );
 }

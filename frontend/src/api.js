@@ -6,9 +6,13 @@ export const API_URLS = {
   TOPOLOGY: `${API_BASE}/api/v1/cluster/topology`,
   ECONOMICS: `${API_BASE}/api/v1/economics/summary`,
   MODELS: `${API_BASE}/api/v1/models`,
+  ADD_MODEL: `${API_BASE}/api/v1/models`,
+  UPDATE_MODEL: (id) => `${API_BASE}/api/v1/models/${id}`,
+  DELETE_MODEL: (id) => `${API_BASE}/api/v1/models/${id}`,
   SIMULATE: `${API_BASE}/simulate`,
   PREDICT_NODE: (nodeId) => `${API_BASE}/api/v1/cluster/node/${nodeId}/predict`,
-  NODE_HISTORY: (nodeId) => `${API_BASE}/api/v1/cluster/node/${nodeId}/history`
+  NODE_HISTORY: (nodeId) => `${API_BASE}/api/v1/cluster/node/${nodeId}/history`,
+  NODE_DRIVES: (nodeId) => `${API_BASE}/api/v1/cluster/node/${nodeId}/drives`
 };
 
 export const fetchApi = async (url, options = {}) => {

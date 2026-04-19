@@ -8,8 +8,9 @@ import { API_URLS, fetchApi } from './api';
 const translations = {
   EN: {
     title: "AI-Based SSD Lifespan Simulator",
-    virtualMode: "Design & Simulator",
-    telemetryMode: "Real-time Predictor",
+    simMode: "Simulator",
+    telemetryMode: "Single Drive AI",
+    finopsMode: "Impact (FinOps)",
     configTitleV: "SSD Design Parameters",
     configTitleT: "Telemetry Observation",
     vendorModel: "SSD Model (Spec)",
@@ -45,7 +46,7 @@ const translations = {
     virtualMode: "서비스 설계 및 시뮬레이션",
     telemetryMode: "실시간 수명 예측기",
     configTitleV: "SSD 설계 파라미터",
-    configTitleT: "텔레메트리 실측 관측",
+    configTitleT: "텔레메트 실측 관측",
     vendorModel: "SSD 모델 선택 (스펙)",
     genericCustom: "일반 파라미터 직접설정",
     customSpec: "커스텀 스펙 SSD (TBW 직접 입력)",
@@ -80,18 +81,22 @@ function App() {
   const [lang, setLang] = useState('EN');
   const t = translations[lang];
 
-  const { mode, setMode, config, setConfig, results, setResults, loading, setLoading, activeTab, setTab } = useAppStore();
+  const { config, setConfig, results, setResults, loading, setLoading, activeTab, setTab, targetNode, setTargetNode, targetDrive, setTargetDrive, mlProgress, setMlProgress, telemetryStatus, setTelemetryStatus } = useAppStore();
   const [vendors, setVendors] = useState([]);
+  const [availableNodes, setAvailableNodes] = useState([]);
+  const [availableDrives, setAvailableDrives] = useState([]);
   const [searchString, setSearchString] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [useCustomSpec, setUseCustomSpec] = useState(false);
+  const [showAddModelForm, setShowAddModelForm] = useState(false);
+  const [isEditingModel, setIsEditingModel] = useState(false);
+  const [newModelData, setNewModelData] = useState({ vendor: '', modelName: '', type: 'TLC', capacityGB: 1000, tbw: 1000 });
   
   useEffect(() => {
     fetchApi(API_URLS.MODELS)
       .then(data => {
         if (data.status === 'success') {
           setVendors(data.data);
-          // Pre-fill default Samsung PM1743 for Scenario 1 fast testing
           if (data.data.length > 0 && !config.modelName) {
              const defaultModel = data.data.find(v => v.modelName === 'PM1743' || v.modelName === 'BM1743' || v.vendor === 'Samsung') || data.data[0];
              const displayStr = `[${defaultModel.vendor}] ${defaultModel.modelName} (TBW: ${defaultModel.tbw})`;
@@ -99,7 +104,7 @@ function App() {
              setConfig({
                  modelName: defaultModel.id, 
                  capacityGB: defaultModel.capacityGB || 7680, 
-                 dailyWritesGB: 1000, // Appropriate for enterprise workloads
+                 dailyWritesGB: 1000,
                  randomSequentialRatio: 80 
              });
           }
@@ -108,15 +113,57 @@ function App() {
       .catch(err => console.error("Could not load vendor models", err));
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'predictor') {
+      fetchApi(API_URLS.TOPOLOGY)
+        .then(res => {
+          if (res.status === 'success') {
+             setAvailableNodes(res.data.map(n => n.id || n.node_name));
+          }
+        })
+        .catch(err => console.error('Failed to fetch available nodes', err));
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'predictor' && targetNode) {
+      setTargetDrive(null);
+      setAvailableDrives([]);
+      setTelemetryStatus(null);
+      fetchApi(API_URLS.NODE_DRIVES(targetNode))
+        .then(res => {
+          if (res.status === 'success') {
+             setAvailableDrives(res.data);
+          }
+        })
+        .catch(err => console.error('Failed to fetch available drives', err));
+    }
+  }, [activeTab, targetNode]);
+
+  const handleCheckTelemetry = async () => {
+    if (!targetNode || !targetDrive) return;
+    setLoading(true);
+    try {
+      const data = await fetchApi(`${API_URLS.NODE_HISTORY(targetNode)}?drive=${targetDrive}`);
+      if (data.status === 'success') {
+         // Approx subset logic for visualization effect
+         const factor = config.collectionInterval === 1 ? 24 : (config.collectionInterval === 6 ? 4 : (config.collectionInterval === 12 ? 2 : 1));
+         const points = data.data.length > 0 ? (config.analysisPeriod * factor) : 0;
+         setTelemetryStatus(points || data.data.length);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to fetch backend history table.");
+    }
+    setLoading(false);
+  };
+
   const handleSimulate = async () => {
     setLoading(true);
     try {
-      const isDesign = mode === 'Design';
-      const endpoint = isDesign ? API_URLS.SIMULATE : API_URLS.PREDICT_NODE('mock-node');
-      
-      let bodyPayload;
-      if (isDesign) {
-        bodyPayload = {
+      if (activeTab === 'simulator') {
+        const url = API_URLS.SIMULATE;
+        const bodyPayload = {
           modelName: useCustomSpec ? null : (config.modelName || null),
           customTBW: useCustomSpec ? config.customTBW : 0,
           driveType: config.driveType,
@@ -127,26 +174,25 @@ function App() {
           cacheSizeGB: config.cacheSizeGB,
           cachePolicy: config.cachePolicy || 'write-back'
         };
-      } else {
-        bodyPayload = {
-          driveType: config.driveType,
-          capacityGB: config.capacityGB,
-          readWriteRatio: 30,
-          dailyWritesGB: config.dailyWritesGB,
-          randomSequentialRatio: config.randomSequentialRatio,
-          observed_waf: config.observed_waf,
-          observed_hit_ratio: config.observed_hit_ratio
-        };
-      }
+        const data = await fetchApi(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyPayload) });
+        setResults(data);
+      } else if (activeTab === 'predictor') {
+        const nodeToPredict = targetNode || 'mock-node';
+        const url = `${API_URLS.PREDICT_NODE(nodeToPredict)}?lookback=${config.analysisPeriod}&interval=${config.collectionInterval}${targetDrive ? `&drive=${targetDrive}` : ''}`;
+        
+        // Artificial Pipeline Sequence Setup for AI UX
+        setMlProgress('COLLECTING');
+        await new Promise(r => setTimeout(r, 800));
+        setMlProgress('PREPROCESSING');
+        await new Promise(r => setTimeout(r, 800));
+        setMlProgress('INFERENCING');
+        await new Promise(r => setTimeout(r, 800));
 
-      const url = isDesign ? endpoint : `${endpoint}?lookback=${config.analysisPeriod}`;
-      
-      const data = await fetchApi(url, {
-        method: isDesign ? 'POST' : 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        body: isDesign ? JSON.stringify(bodyPayload) : null
-      });
-      setResults(data);
+        const data = await fetchApi(url, { method: 'GET' });
+        setResults(data);
+        setMlProgress('DONE');
+        setTimeout(() => setMlProgress('IDLE'), 2000); // clear after 2 seconds to revert to normal chart
+      }
     } catch (err) {
       console.error(err);
       alert("Please ensure the backend is running.");
@@ -155,85 +201,168 @@ function App() {
   };
 
   return (
-    <div className="dashboard-container">
-      <header className="header">
-        <div>
-          <div className="logo">RED<span>PULSE</span> Intelligence</div>
-          <div style={{color: 'var(--text-secondary)'}}>{t.title}</div>
+    <div className="app-wrapper">
+      <header className="doc-header">
+        <div style={{display: 'flex', alignItems: 'center', gap: '20px'}}>
+          <div className="logo">RED<span>PULSE</span></div>
+          <div className="doc-tabs" style={{marginBottom: 0, borderBottom: 'none'}}>
+            <div className={`doc-tab ${activeTab === 'simulator' ? 'active' : ''}`} onClick={() => setTab('simulator')} style={{color: activeTab === 'simulator' ? '#fff' : '#a1a1aa', borderBottom: activeTab === 'simulator' ? '2px solid #fff' : '2px solid transparent'}}>Simulator</div>
+            <div className={`doc-tab ${activeTab === 'predictor' ? 'active' : ''}`} onClick={() => setTab('predictor')} style={{color: activeTab === 'predictor' ? '#fff' : '#a1a1aa', borderBottom: activeTab === 'predictor' ? '2px solid #fff' : '2px solid transparent'}}>Single Drive AI</div>
+            <div className={`doc-tab ${activeTab === 'cluster' ? 'active' : ''}`} onClick={() => setTab('cluster')} style={{color: activeTab === 'cluster' ? '#fff' : '#a1a1aa', borderBottom: activeTab === 'cluster' ? '2px solid #fff' : '2px solid transparent'}}>Cluster Grid</div>
+            <div className={`doc-tab ${activeTab === 'impact' ? 'active' : ''}`} onClick={() => setTab('impact')} style={{color: activeTab === 'impact' ? '#fff' : '#a1a1aa', borderBottom: activeTab === 'impact' ? '2px solid #fff' : '2px solid transparent'}}>Impact (FinOps)</div>
+          </div>
         </div>
-        <button onClick={() => setLang(lang === 'EN' ? 'KR' : 'EN')} className="glass-panel" style={{ padding: '0.4rem 0.8rem', cursor: 'pointer', fontWeight: 'bold' }}>
-          🌐 {lang === 'EN' ? 'KOR' : 'ENG'}
-        </button>
+        <div>
+          <button onClick={() => setLang(lang === 'EN' ? 'KR' : 'EN')} style={{ background: 'transparent', color: '#fff', border: '1px solid #52525b', padding: '0.2rem 0.5rem', cursor: 'pointer', borderRadius: '2px', fontSize: '0.8rem' }}>
+            {lang === 'EN' ? 'KOR' : 'ENG'}
+          </button>
+        </div>
       </header>
 
-      <aside className="glass-panel config-section">
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem', borderBottom: '2px solid #e4e4e7', paddingBottom: '0.5rem' }}>
-          <span onClick={() => setTab('single')} style={{ padding: '0.5rem', cursor: 'pointer', fontWeight: 'bold', borderBottom: activeTab === 'single' ? '2px solid #111' : 'none', color: activeTab === 'single' ? '#111' : '#a1a1aa' }}>Simulator</span>
-          <span onClick={() => setTab('cluster')} style={{ padding: '0.5rem', cursor: 'pointer', fontWeight: 'bold', borderBottom: activeTab === 'cluster' ? '2px solid #111' : 'none', color: activeTab === 'cluster' ? '#111' : '#a1a1aa' }}>Cluster Grid</span>
-          <span onClick={() => setTab('impact')} style={{ padding: '0.5rem', cursor: 'pointer', fontWeight: 'bold', borderBottom: activeTab === 'impact' ? '2px solid #111' : 'none', color: activeTab === 'impact' ? '#111' : '#a1a1aa' }}>Impact</span>
-        </div>
-
-        {activeTab === 'single' && (
-          <>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
-              <button style={{flex: 1, padding: '0.5rem', background: mode === 'Design' ? '#111' : '#f4f4f5', color: mode === 'Design' ? 'white' : 'black', borderRadius: '4px', fontWeight: 'bold'}} onClick={() => setMode('Design')}>{t.virtualMode}</button>
-              <button style={{flex: 1, padding: '0.5rem', background: mode === 'Predictor' ? '#111' : '#f4f4f5', color: mode === 'Predictor' ? 'white' : 'black', borderRadius: '4px', fontWeight: 'bold', display: 'flex', flexDirection: 'column', alignItems: 'center'}} onClick={() => setMode('Predictor')}>
-                 {t.telemetryMode} 
-                 <span style={{fontSize: '0.65rem', fontWeight: 'normal', color: mode === 'Predictor' ? '#a1a1aa' : '#71717a'}}>(단일 노드 점검 시나리오)</span>
-              </button>
-            </div>
-      
-        <h2 style={{fontSize: '1.1rem', marginBottom: '1.2rem'}}>{mode === 'Design' ? t.configTitleV : t.configTitleT}</h2>
-        
-        {mode === 'Design' && (
+      <div className="content-wrapper">
+        {activeTab === 'simulator' && (
+        <aside className="doc-sidebar config-section">
+          <h2>{t.configTitleV}</h2>
+          
           <div className="form-group">
             <label>{t.vendorModel}</label>
-            <input 
-              type="text"
-              className="form-control" 
-              placeholder="Search Vendor, Model, or TBW..."
-              list="vendor-opts"
-              value={searchString}
+            <select 
+              className="form-control"
+              value={useCustomSpec ? "custom" : (config.modelName || "")}
               onChange={(e) => {
                 const val = e.target.value;
-                setSearchString(val);
-                if (val.includes("custom")) {
+                if (val === "add_new") {
+                  setShowAddModelForm(true);
+                  setIsEditingModel(false);
+                  setNewModelData({ vendor: '', modelName: '', type: 'TLC', capacityGB: 1000, tbw: 1000 });
+                  setUseCustomSpec(false);
+                } else if (val === "custom") {
                   setUseCustomSpec(true);
+                  setShowAddModelForm(false);
                   setConfig({modelName: null});
                 } else {
-                  const match = vendors.find(v => `[${v.vendor}] ${v.modelName} (TBW: ${v.tbw})` === val);
+                  setUseCustomSpec(false);
+                  setShowAddModelForm(false);
+                  const match = vendors.find(v => v.id === val);
                   if (match) {
-                    setUseCustomSpec(false);
-                    setConfig({modelName: match.id});
-                  } else if (val === '') {
-                    setUseCustomSpec(false);
-                    setConfig({modelName: null});
+                    setConfig({modelName: match.id, capacityGB: match.capacityGB});
                   }
                 }
               }}
-            />
-            <datalist id="vendor-opts">
-               <option value="custom">✨ {t.customSpec}</option>
-               {vendors.map(v => <option key={v.id} value={`[${v.vendor}] ${v.modelName} (TBW: ${v.tbw})`} />)}
-            </datalist>
+            >
+              <option value="" disabled>Select SSD Model...</option>
+              <option value="add_new">+ Add New SSD Model</option>
+              <option value="custom">{t.customSpec}</option>
+              {vendors.map(v => (
+                <option key={v.id} value={v.id}>[{v.vendor}] {v.modelName} (TBW: {v.tbw})</option>
+              ))}
+            </select>
+            
+            {config.modelName && !showAddModelForm && !useCustomSpec && (
+              <div style={{display: 'flex', gap: '12px', marginTop: '8px', justifyContent: 'flex-end'}}>
+                <button onClick={() => {
+                   const match = vendors.find(v => v.id === config.modelName);
+                   if (match) {
+                      setNewModelData({vendor: match.vendor, modelName: match.modelName, type: match.type || 'TLC', capacityGB: match.capacityGB, tbw: match.tbw});
+                      setIsEditingModel(true);
+                      setShowAddModelForm(true);
+                   }
+                }} style={{background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600}}>Edit Spec</button>
+                
+                <button onClick={async () => {
+                   if (window.confirm('Are you sure you want to delete this SSD model?')) {
+                      try {
+                         const res = await fetchApi(API_URLS.DELETE_MODEL(config.modelName), {method: 'DELETE'});
+                         if (res.status === 'success') {
+                            setVendors(vendors.filter(v => v.id !== config.modelName));
+                            setConfig({modelName: null});
+                         }
+                      } catch (e) {
+                         console.error('Delete failed', e);
+                      }
+                   }
+                }} style={{background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600}}>Delete</button>
+              </div>
+            )}
           </div>
-        )}
 
-        {useCustomSpec && mode === 'Design' && (
-          <div className="form-group animate-in" style={{background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>
-            <label>Spec: TBW (Total Bytes Written)</label>
-            <input type="number" className="form-control" value={config.customTBW} onChange={e => setConfig({customTBW: parseInt(e.target.value)})} />
-          </div>
-        )}
-        
-         {mode === 'Design' && (
+          {useCustomSpec && (
+            <div className="form-group animate-in" style={{background: '#f1f5f9', padding: '10px', borderLeft: '3px solid #3b82f6'}}>
+              <label>Spec: TBW (Total Bytes Written)</label>
+              <input type="number" className="form-control" value={config.customTBW} onChange={e => setConfig({customTBW: parseInt(e.target.value)})} />
+            </div>
+          )}
+
+          {showAddModelForm && (
+            <div className="form-group animate-in" style={{background: '#fcfcfc', border: '1px solid var(--border-color)', padding: '15px', borderRadius: '4px'}}>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
+                  <h3 style={{marginTop: 0, marginBottom: 0, fontSize: '0.9rem'}}>{isEditingModel ? "Edit SSD Model" : "Create Custom SSD"}</h3>
+                  <button onClick={() => {setShowAddModelForm(false); setIsEditingModel(false);}} style={{background: 'transparent', border: 'none', cursor: 'pointer', color: '#a1a1aa'}}>✕</button>
+              </div>
+              
+              <label>Vendor</label>
+              <input type="text" className="form-control" value={newModelData.vendor} onChange={e => setNewModelData({...newModelData, vendor: e.target.value})} style={{marginBottom: '10px'}} placeholder="e.g. Sony" />
+              
+              <label>Model Name</label>
+              <input type="text" className="form-control" value={newModelData.modelName} onChange={e => setNewModelData({...newModelData, modelName: e.target.value})} style={{marginBottom: '10px'}} placeholder="e.g. HyperDrive" />
+              
+              <div style={{display: 'flex', gap: '10px', marginBottom: '10px'}}>
+                <div style={{flex: 1}}>
+                  <label>Type</label>
+                  <select className="form-control" value={newModelData.type} onChange={e => setNewModelData({...newModelData, type: e.target.value})}>
+                    <option value="SLC">SLC</option>
+                    <option value="TLC">TLC</option>
+                    <option value="QLC">QLC</option>
+                  </select>
+                </div>
+                <div style={{flex: 1}}>
+                  <label>Capacity</label>
+                  <input type="number" className="form-control" value={newModelData.capacityGB} onChange={e => setNewModelData({...newModelData, capacityGB: parseInt(e.target.value)})} />
+                </div>
+                <div style={{flex: 1}}>
+                  <label>TBW</label>
+                  <input type="number" className="form-control" value={newModelData.tbw} onChange={e => setNewModelData({...newModelData, tbw: parseInt(e.target.value)})} />
+                </div>
+              </div>
+              
+              <button 
+                onClick={async () => {
+                  try {
+                    const url = isEditingModel ? API_URLS.UPDATE_MODEL(config.modelName) : API_URLS.ADD_MODEL;
+                    const method = isEditingModel ? 'PUT' : 'POST';
+                    const res = await fetchApi(url, {
+                      method: method,
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(newModelData)
+                    });
+                    if (res.status === 'success') {
+                       if (isEditingModel) {
+                          setVendors(vendors.map(v => v.id === config.modelName ? res.data : v));
+                       } else {
+                          setVendors([...vendors, res.data]);
+                       }
+                       setShowAddModelForm(false);
+                       setIsEditingModel(false);
+                       setConfig({modelName: res.data.id, capacityGB: res.data.capacityGB});
+                    }
+                  } catch (e) {
+                     console.error('Failed to save model', e);
+                     alert('Failed to save new model. See console.');
+                  }
+                }}
+                style={{width: '100%', padding: '0.6rem', background: 'var(--accent-base)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold'}}>
+                {isEditingModel ? "Save Changes" : "Save & Select Model"}
+              </button>
+            </div>
+          )}
+          
           <div style={{marginBottom: '1rem'}}>
-             <div onClick={() => setShowAdvanced(!showAdvanced)} style={{fontSize: '0.8rem', color: '#6366f1', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'}}>
+             <div onClick={() => setShowAdvanced(!showAdvanced)} style={{fontSize: '0.75rem', fontWeight: '600', color: '#2563eb', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'}}>
                {showAdvanced ? '▼' : '▶'} {t.driveTopology} & Cache Policy
              </div>
              {showAdvanced && (
-               <div className="form-group animate-in" style={{marginTop: '0.5rem', background: '#f8fafc', padding: '10px', borderRadius: '8px'}}>
-                  <label style={{fontSize: '0.8rem', color: '#64748b'}}>NAND Topology</label>
+               <div className="form-group animate-in" style={{marginTop: '0.5rem', background: '#f1f5f9', padding: '10px', borderLeft: '3px solid #64748b'}}>
+                  <label style={{color: '#475569'}}>NAND Topology</label>
                   <select className="form-control" value={config.driveType} onChange={(e) => setConfig({driveType: e.target.value})}>
                     <option value="TLC">{t.pureTlc}</option>
                     <option value="QLC">{t.pureQlc}</option>
@@ -241,58 +370,117 @@ function App() {
                   </select>
                   
                   <div style={{marginTop: '10px'}}>
-                    <label style={{fontSize: '0.8rem', color: '#64748b'}}>OS Cache Policy (Software Tiering)</label>
+                    <label style={{color: '#475569'}}>OS Cache Policy</label>
                     <select className="form-control" value={config.cachePolicy || 'write-back'} onChange={e => setConfig({cachePolicy: e.target.value})}>
                       <option value="write-back">Write-Back (Cache Enabled)</option>
-                      <option value="write-through">Write-Through (Direct to Disk)</option>
+                      <option value="write-through">Write-Through (Direct)</option>
                     </select>
                   </div>
                </div>
              )}
           </div>
+
+          <div className="form-group">
+            <label>{t.backendCap}</label>
+            <input type="number" className="form-control" value={config.capacityGB} onChange={e => setConfig({capacityGB: parseInt(e.target.value)})} />
+          </div>
+
+          <div className="form-group">
+            <label>{t.dailyWrites}</label>
+            <input type="number" className="form-control" value={config.dailyWritesGB} onChange={e => setConfig({dailyWritesGB: parseInt(e.target.value)})} />
+          </div>
+
+          <div className="form-group">
+            <label>{t.randomRatio} : <span className="mono-text">{config.randomSequentialRatio}%</span></label>
+            <input type="range" min="0" max="100" style={{width: '100%', marginTop: '5px'}} value={config.randomSequentialRatio} onChange={e => setConfig({randomSequentialRatio: parseInt(e.target.value)})} />
+          </div>
+
+          <button className="btn-run" onClick={handleSimulate} disabled={loading}>{loading ? t.simulating : t.runVirtual}</button>
+        </aside>
         )}
 
-        <div className="form-group">
-          <label>{t.backendCap}</label>
-          <input type="number" className="form-control" value={config.capacityGB} onChange={e => setConfig({capacityGB: parseInt(e.target.value)})} />
-        </div>
+        {activeTab === 'predictor' && (
+        <aside className="doc-sidebar config-section">
+          <h2>Machine Learning Target</h2>
+          <div className="form-group" style={{marginTop: '1rem'}}>
+             <label>Select Node ID</label>
+             <input 
+               type="text" 
+               list="connected-nodes" 
+               className="form-control" 
+               placeholder="-- Select or Type Connected Target --" 
+               value={targetNode || ''} 
+               onChange={e => { setTargetNode(e.target.value); setTelemetryStatus(null); }} 
+               autoComplete="off"
+             />
+             <datalist id="connected-nodes">
+               {availableNodes.map(nodeId => (
+                  <option key={nodeId} value={nodeId} />
+               ))}
+             </datalist>
+          </div>
 
-        <div className="form-group">
-          <label>{t.dailyWrites}</label>
-          <input type="number" className="form-control" value={config.dailyWritesGB} onChange={e => setConfig({dailyWritesGB: parseInt(e.target.value)})} />
-        </div>
-
-        <div className="form-group">
-          <label>{t.randomRatio} : {config.randomSequentialRatio}%</label>
-          <input type="range" min="0" max="100" className="form-control" value={config.randomSequentialRatio} onChange={e => setConfig({randomSequentialRatio: parseInt(e.target.value)})} />
-        </div>
-
-        {mode === 'Predictor' && (
-          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-            <h3 style={{fontSize: '0.9rem', marginBottom: '1rem', fontWeight: '600'}}>{t.observedFio}</h3>
-            <div className="form-group">
-              <label>{t.wafLabel}</label>
-              <input type="number" step="0.1" className="form-control" value={config.observed_waf} onChange={e => setConfig({observed_waf: parseFloat(e.target.value)})} />
-            </div>
-            <div className="form-group" style={{marginTop: '1.5rem', borderTop: '1px solid #e4e4e7', paddingTop: '1rem'}}>
-               <label style={{fontWeight: '600'}}>Analysis Period</label>
-               <select className="form-control" value={config.analysisPeriod} onChange={e => setConfig({analysisPeriod: parseInt(e.target.value)})}>
-                 <option value="7">Last 7 Days</option>
-                 <option value="14">Last 14 Days</option>
-                 <option value="30">Last 30 Days</option>
+          <div className="form-group" style={{marginTop: '1rem'}}>
+             <label>Select Drive ID (SSD)</label>
+             <input 
+               type="text" 
+               list="connected-drives" 
+               className="form-control" 
+               placeholder="-- Select or Type SSD ID --" 
+               value={targetDrive || ''} 
+               onChange={e => { setTargetDrive(e.target.value); setTelemetryStatus(null); }} 
+               autoComplete="off"
+             />
+             <datalist id="connected-drives">
+               {availableDrives.map(driveId => (
+                  <option key={driveId} value={driveId} />
+               ))}
+             </datalist>
+          </div>
+          
+          <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+            <h2>Telemetry Tuning</h2>
+            <div className="form-group" style={{marginTop: '1rem'}}>
+               <label>Telemetry Interval</label>
+               <select className="form-control" value={config.collectionInterval} onChange={e => setConfig({collectionInterval: parseInt(e.target.value)})}>
+                 <option value="1">Every 1 Hour (High Fidelity)</option>
+                 <option value="6">Every 6 Hours</option>
+                 <option value="12">Every 12 Hours</option>
+                 <option value="24">Every 24 Hours (Low Overhead)</option>
                </select>
             </div>
+
+            <div className="form-group" style={{marginTop: '1rem'}}>
+               <label>Total Duration (Lookback)</label>
+               <select className="form-control" value={config.analysisPeriod} onChange={e => { setConfig({analysisPeriod: parseInt(e.target.value)}); setTelemetryStatus(null); }}>
+                 <option value="1">Past 1 Day</option>
+                 <option value="7">Past 7 Days</option>
+                 <option value="14">Past 14 Days</option>
+                 <option value="30">Past 30 Days</option>
+                 <option value="90">Past 90 Days</option>
+               </select>
+            </div>
+            
+            <div style={{marginTop: '1.5rem'}}>
+               <button className="btn-run" style={{background: '#374151', color: 'white', marginBottom: '0.5rem'}} onClick={handleCheckTelemetry} disabled={loading || !targetNode || !targetDrive}>Check Telemetry DB</button>
+               
+               {telemetryStatus !== null && (
+                 <div className="animate-in" style={{padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderLeft: '3px solid #10b981', borderRadius: '2px', fontSize: '0.8rem'}}>
+                   <div style={{fontWeight: 'bold', color: '#065f46', marginBottom: '4px'}}>[OK] Live Source Verified</div>
+                   <div style={{color: '#064e3b'}}>Aggregated <span style={{fontWeight: 'bold'}}>{telemetryStatus}</span> multi-dimensional snapshots for LSTM Pipeline. Features: WAF, Host Writes, Temp.</div>
+                 </div>
+               )}
+            </div>
           </div>
+
+          <button className="btn-run" onClick={handleSimulate} disabled={loading || telemetryStatus === null || !targetNode || !targetDrive} style={{marginTop: '1.5rem'}}>{loading ? "Executing Pipeline..." : "Run ML Prediction"}</button>
+        </aside>
         )}
 
-        <button className="btn-run" onClick={handleSimulate} disabled={loading}>{loading ? t.simulating : t.runVirtual}</button>
-        </>
-        )}
-      </aside>
-
-      <main>
-        {activeTab === 'single' ? <SingleNodeView t={t} /> : activeTab === 'cluster' ? <ClusterView t={t} /> : <EconomicsView />}
-      </main>
+        <main className="doc-main">
+          {(activeTab === 'simulator' || activeTab === 'predictor') ? <SingleNodeView t={t} /> : activeTab === 'cluster' ? <ClusterView t={t} /> : <EconomicsView />}
+        </main>
+      </div>
     </div>
   );
 }

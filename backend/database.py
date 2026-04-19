@@ -89,17 +89,38 @@ def get_latest_topology():
         
     return topology
 
-def get_node_history(node_name, limit=30):
+def get_node_drives(node_name):
     """
-    Get the telemetry history for a specific node with a configurable limit.
+    Get a list of distinct drive IDs mounted on a specific node.
     """
     with get_db() as cursor:
         cursor.execute('''
-        SELECT * FROM telemetry 
-        WHERE node_name = ? 
-        ORDER BY timestamp DESC 
-        LIMIT ?
-        ''', (node_name, limit))
+        SELECT DISTINCT drive_id FROM telemetry 
+        WHERE node_name = ? AND drive_id IS NOT NULL
+        ''', (node_name,))
+        
+        rows = cursor.fetchall()
+        return [row['drive_id'] for row in rows]
+
+def get_node_history(node_name, drive_id=None, limit=30):
+    """
+    Get the telemetry history for a specific node and an optional drive with a configurable limit.
+    """
+    with get_db() as cursor:
+        if drive_id:
+            cursor.execute('''
+            SELECT * FROM telemetry 
+            WHERE node_name = ? AND drive_id = ?
+            ORDER BY timestamp DESC 
+            LIMIT ?
+            ''', (node_name, drive_id, limit))
+        else:
+            cursor.execute('''
+            SELECT * FROM telemetry 
+            WHERE node_name = ? 
+            ORDER BY timestamp DESC 
+            LIMIT ?
+            ''', (node_name, limit))
         
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
