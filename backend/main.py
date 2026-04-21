@@ -126,6 +126,8 @@ def get_cluster_topology():
         for idx, drive_id in enumerate(sorted_drive_ids):
             data = drives[drive_id]
             severity = 0
+            
+            # Severity logic based on WAF and Available Spare
             if data['waf'] > 5.0 or data['available_spare_percent'] < 10:
                 severity = 2
             elif data['waf'] > 3.0 or data['available_spare_percent'] < 30:
@@ -134,19 +136,28 @@ def get_cluster_topology():
             if severity > max_severity:
                 max_severity = severity
                 
+            # Health calculation: weighted average of spare and waf impact
+            # Assuming TBW of 1000TB for a standard drive for this summary
+            spare_health = data['available_spare_percent']
+            waf_health = max(0, 100 - (data['waf'] * 8)) 
+            agg_health = min(spare_health, waf_health)
+
             disks.append({
                 "slot": idx + 1,
                 "drive_id": drive_id,
-                "health": 100 - (data['waf'] * 5),
+                "health": round(agg_health, 2),
                 "severity": severity,
                 "waf": data['waf'],
-                "temp": data['temperature_c']
+                "temp": data['temperature_c'],
+                "spare": data['available_spare_percent']
             })
             
         topology.append({
             "id": node_id,
             "disks": disks,
-            "maxSeverity": max_severity
+            "maxSeverity": max_severity,
+            "uptime_days": 124, # Mock uptime for UI
+            "location": "Rack-A-01" # Mock location
         })
         
     return {"status": "success", "data": topology}
