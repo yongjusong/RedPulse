@@ -24,7 +24,7 @@
 ### 📝 Task Checklist
 - [x] 백엔드: 다중 디바이스 시계열 데이터를 캐싱하기 위한 구조 개선 (In-memory structured mapping)
 - [x] 프론트엔드: 기존 UI를 클러스터 뷰/그리드 뷰로 확장
-- [ ] 프론트엔드: 필터링 및 드릴다운(Drill-down) 패널 개발
+- [x] 프론트엔드: 필터링 및 드릴다운(Drill-down) 패널 개발
 - [x] 프론트엔드: 상태 관리 라이브러리(Zustand) 도입 및 연동
 
 ## Phase 3: AI 모델 고도화 (Deep Learning / Time-Series AI)
@@ -33,9 +33,9 @@
 - 초기 쓰기 증폭(WAF) 스파이크(Spike)가 있을 때 모델이 이를 과대 해석하지 않도록 노이즈 대응 메커니즘 추가
 
 ### 📝 Task Checklist
-- [ ] 딥러닝 훈련 환경(PyTorch) 세팅 및 시뮬레이션 합성 데이터 포맷팅
-- [ ] LSTM / Transformer 기반의 시계열 예측 모델 프로토타입 훈련
-- [ ] 기존 Scikit-learn 엔진과 신규 딥러닝 모델 간 앙상블 시스템 구축
+- [x] 딥러닝 훈련 환경(PyTorch) 세팅 및 시뮬레이션 합성 데이터 포맷팅
+- [x] LSTM / Transformer 기반의 시계열 예측 모델 프로토타입 훈련
+- [x] 기존 Scikit-learn 엔진과 신규 딥러닝 모델 간 앙상블 시스템 구축
 
 ## Phase 4: 엔터프라이즈 리포팅 및 TCO 분석 (Cost & ROI)
 **목표**: 기업의 IT 예산 산정에 직접적인 도움 제공.

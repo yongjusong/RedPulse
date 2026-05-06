@@ -1,6 +1,7 @@
 import os
 import torch
 import torch.nn as nn
+import joblib
 
 # Light-weight Online Inference Module
 # This module represents the "Asymmetric Compute Burden" principle.
@@ -49,6 +50,28 @@ def load_lstm_model():
     
     return None
 
+def load_rf_model():
+    """
+    Lazy load the Scikit-learn Random Forest model.
+    """
+    global _MODELS_CACHE
+    if "rf" in _MODELS_CACHE:
+        return _MODELS_CACHE["rf"]
+        
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    full_path = os.path.join(base_dir, "ai/pretrained_rf_model.pkl")
+    
+    if os.path.exists(full_path):
+        try:
+            model = joblib.load(full_path)
+            _MODELS_CACHE["rf"] = model
+            print(f"[Live Inference Engine] Loaded pure inference layer from {full_path}")
+            return model
+        except Exception as e:
+            print(f"Error loading RF model: {e}")
+    
+    return None
+
 def predict_rul_with_lstm(sequence: list):
     """
     Takes a sequence of [waf, hit_ratio] and predicts RUL in days.
@@ -76,25 +99,49 @@ def predict_rul_telemetry(drive_type, capacity_gb, writes_gb, rand_ratio, cache_
     sequence = [[waf, hit_ratio]] * 30
     return predict_rul_with_lstm(sequence)
 
-def predict_rul_ensemble(sequence: list, capacity_gb: int, daily_writes_gb: int, waf_avg: float) -> float:
+def predict_rul_ensemble(sequence: list, drive_type: str, capacity_gb: int, daily_writes_gb: int, random_ratio: float, cache_size_gb: int, waf_avg: float, hit_ratio_avg: float) -> float:
     """
-    Ensemble Model: Combine LSTM Deep Learning (70%) with a Deterministic Physical Fallback (30%)
-    to prevent DL overfitting or catastrophic outliers.
+    Ensemble Model: Combine LSTM Deep Learning (70%) with Scikit-learn Random Forest (30%).
+    This establishes a robust forecasting system leveraging two distinct architectures.
     """
     dl_days = predict_rul_with_lstm(sequence)
     
-    # Deterministic Mock RandomForest / Rule-based
-    # P/E limit approx 3000 for TLC
+    rf_model = load_rf_model()
+    
+    if rf_model:
+        # Encode drive_type as expected by the model
+        drive_type_encoded = 0 # TLC
+        if drive_type == "QLC":
+            drive_type_encoded = 1
+        elif drive_type == "Hybrid":
+            drive_type_encoded = 2
+            
+        features = [[
+            drive_type_encoded, 
+            capacity_gb, 
+            daily_writes_gb, 
+            random_ratio, 
+            cache_size_gb, 
+            waf_avg, 
+            hit_ratio_avg
+        ]]
+        
+        try:
+            rf_days = rf_model.predict(features)[0]
+        except Exception as e:
+            print(f"Error during RF predict, falling back. {e}")
+            rf_days = _deterministic_fallback(capacity_gb, daily_writes_gb, waf_avg)
+    else:
+        rf_days = _deterministic_fallback(capacity_gb, daily_writes_gb, waf_avg)
+    
+    # Blend outputs
+    ensemble_days = (dl_days * 0.70) + (rf_days * 0.30)
+    
+    return int(ensemble_days)
+
+def _deterministic_fallback(capacity_gb: int, daily_writes_gb: int, waf_avg: float) -> float:
     actual_daily_writes = daily_writes_gb * max(1.0, waf_avg)
     if actual_daily_writes <= 0:
         actual_daily_writes = 0.1
-    # total lifespan days = (capacity * PE limit) / daily
     deterministic_days = (capacity_gb * 3000) / actual_daily_writes
-    
-    # Cap deterministic anomalies
-    deterministic_days = min(3650, deterministic_days) # Cap at 10 years
-    
-    # Blend outputs
-    ensemble_days = (dl_days * 0.70) + (deterministic_days * 0.30)
-    
-    return int(ensemble_days)
+    return min(3650, deterministic_days)

@@ -344,7 +344,25 @@ def predict_node_life_with_lstm(node_name: str, lookback: int = 30, drive: str =
         
     # Ensemble AI call instead of purely LSTM to prevent overfitting logic
     avg_waf = sum([x[0] for x in sequence]) / len(sequence)
-    predicted_rul = predict_rul_ensemble(sequence, capacity_gb=4000, daily_writes_gb=100, waf_avg=avg_waf)
+    avg_hit = sum([x[1] for x in sequence]) / len(sequence)
+    
+    # Mock data for missing telemetry variables (in a real system these would be in node profile)
+    mock_drive_type = "TLC"
+    mock_capacity = 4000
+    mock_daily_writes = 100
+    mock_random_ratio = 0.8
+    mock_cache_size = 0
+    
+    predicted_rul = predict_rul_ensemble(
+        sequence, 
+        drive_type=mock_drive_type, 
+        capacity_gb=mock_capacity, 
+        daily_writes_gb=mock_daily_writes, 
+        random_ratio=mock_random_ratio, 
+        cache_size_gb=mock_cache_size, 
+        waf_avg=avg_waf,
+        hit_ratio_avg=avg_hit
+    )
     
     # Calculate Confidence Interval (Uncertainty)
     # The fewer samples we have, the higher the uncertainty (between 5% and 30%)
