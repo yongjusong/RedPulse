@@ -29,7 +29,7 @@ export default function SingleNodeView({ t }) {
                 
                 {mlProgress === 'INFERENCING' && (
                    <div className="animate-in" style={{color: '#60a5fa'}}>
-                      [↻] Forward Pass: Ensemble AI Model (LSTM Layer 1-3) & FinOps Optimizer...
+                      [↻] Forward Pass: Ensemble AI Model (LSTM Layer 1-3)...
                    </div>
                 )}
              </div>
@@ -115,14 +115,6 @@ export default function SingleNodeView({ t }) {
               </div>
            </div>
            
-           {results.optimal_replacement_days !== undefined && (
-             <div className="glass-panel" style={{ flex: 1, padding: '1rem', borderLeft: '4px solid #10b981', background: '#f0fdf4' }}>
-                <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 'bold', marginBottom: '0.5rem' }}>FINOPS OPTIMAL REPLACEMENT</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#065f46' }}>
-                  In {Math.floor(results.optimal_replacement_days / 365)}y {Math.floor(results.optimal_replacement_days % 365)}d (Save ${results.financial_savings_usd.toLocaleString()})
-                </div>
-             </div>
-           )}
          </div>
       )}
 

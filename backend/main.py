@@ -7,9 +7,7 @@ import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from database import init_db, save_telemetry, get_latest_topology, get_node_history, get_node_drives
-from economics import calculate_economics, calculate_optimal_replacement
 from ai.model import predict_rul_telemetry, predict_rul_with_lstm, predict_rul_ensemble, load_lstm_model
-import threading
 
 app = FastAPI(title="RedPulse Simulator API")
 
@@ -27,12 +25,6 @@ async def startup_event():
     print("🔥 Warming up AI Models...")
     load_lstm_model()
     print("✅ Models ready for inference.")
-    
-    # Start the automated reporting cron job in a background thread
-    from report_job import start_reporting_cron
-    cron_thread = threading.Thread(target=start_reporting_cron, daemon=True)
-    cron_thread.start()
-    print("✅ Automated Reporting Daemon started.")
 
 # Define frontend static directory
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -98,16 +90,6 @@ def get_cluster_stats():
             "overall_health": 100 - (critical_disks * 10 + warning_disks * 2) / (total_disks or 1)
         }
     }
-
-
-@app.get("/api/v1/economics/summary")
-def get_economics_summary():
-    """
-    Returns the TCO and Risk Analysis for the entire cluster.
-    """
-    topology = get_latest_topology()
-    econ_data = calculate_economics(topology)
-    return {"status": "success", "data": econ_data}
 
 
 @app.get("/api/v1/cluster/topology")
@@ -379,16 +361,11 @@ def predict_node_life_with_lstm(node_name: str, lookback: int = 30, drive: str =
         health = max(0, 100 - (100 / (predicted_rul or 1)) * day)
         time_series.append({"day": day, "health_percent": round(health, 2)})
 
-    # Calculate Optimal Replacement (TCO FinOps)
-    finops_data = calculate_optimal_replacement(predicted_rul, subject_disk, 4000)
-
     return {
         "status": "success",
         "predicted_rul_days": int(predicted_rul),
         "confidence_lower_days": int(lower_bound_days),
         "confidence_upper_days": int(upper_bound_days),
-        "optimal_replacement_days": finops_data["optimal_replacement_days"],
-        "financial_savings_usd": finops_data["financial_savings_usd"],
         "node_name": node_name,
         "drive_id": subject_disk,
         "time_series_data": time_series

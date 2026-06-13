@@ -4,7 +4,7 @@ const useAppStore = create((set) => ({
   mode: 'Design',
   setMode: (newMode) => set({ mode: newMode }),
   
-  activeTab: 'simulator', // 'simulator', 'predictor', 'cluster', 'impact'
+  activeTab: 'simulator', // 'simulator', 'predictor', 'cluster'
   setTab: (newTab) => set({ activeTab: newTab }),
 
   targetNode: null,

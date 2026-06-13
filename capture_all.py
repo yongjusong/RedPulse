@@ -21,18 +21,6 @@ async def main():
             await asyncio.sleep(2)
             await page.screenshot(path="docs/cluster_grid.png", type="png")
             print("Captured cluster_grid.png")
-            
-            # Navigate to Impact Form
-            await page.click("text=Impact")
-            await asyncio.sleep(2)
-            await page.screenshot(path="docs/finops_impact.png", type="png")
-            print("Captured finops_impact.png")
-            
-            # Capture Executive Report
-            await page.goto("http://localhost:5174/reports/latest_executive_report.html", wait_until="networkidle")
-            await asyncio.sleep(1)
-            await page.screenshot(path="docs/executive_report.png", type="png", full_page=True)
-            print("Captured executive_report.png")
 
         except Exception as e:
             print("Capture failed:", e)

@@ -5,6 +5,7 @@ Headless 환경에서 REST API를 통해 RedPulse의 PreFlight 모드를 즉시 
 """
 
 import argparse
+import os
 import requests
 import sys
 import time
@@ -12,7 +13,7 @@ import socket
 from datetime import datetime
 import random
 
-API_BASE = "http://localhost:8085"
+API_BASE = os.getenv("REDPULSE_API_BASE", "http://localhost:8085")
 
 def cmd_models():
     print("Fetching supported commercial SSD database from RedPulse...")

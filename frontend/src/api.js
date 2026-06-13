@@ -1,10 +1,9 @@
 // Centralized configuration for the API
-const API_BASE = "http://localhost:8085";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8085";
 
 export const API_URLS = {
   STATS: `${API_BASE}/api/v1/cluster/stats`,
   TOPOLOGY: `${API_BASE}/api/v1/cluster/topology`,
-  ECONOMICS: `${API_BASE}/api/v1/economics/summary`,
   MODELS: `${API_BASE}/api/v1/models`,
   ADD_MODEL: `${API_BASE}/api/v1/models`,
   UPDATE_MODEL: (id) => `${API_BASE}/api/v1/models/${id}`,

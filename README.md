@@ -1,115 +1,210 @@
-# RedPulse (레드펄스) - AI-Based SSD Lifespan Simulator
+# RedPulse
 
-![RedPulse Dashboard](docs/simulator_preflight.png)
+RedPulse는 SSD 기반 스토리지 인프라의 잔여 수명(RUL, Remaining Useful Life)을 예측하고, 여러 노드의 디스크 상태를 한 화면에서 추적하기 위한 웹 기반 대시보드입니다.
 
-RedPulse는 물리적인 자원과 시간을 소비하지 않고, 인공지능(AI)과 가상 시뮬레이션을 통해 다양한 스토리지 구성(TLC, QLC, Hybrid)의 **잔여 수명(RUL, Remaining Useful Life)**을 단 몇 초 만에 예측해내는 웹 기반 대시보드 도구입니다.
+스토리지 엔지니어, 데이터센터 운영자, SRE, 플랫폼 운영 담당자가 다음 질문에 빠르게 답하도록 돕는 것이 목표입니다.
 
-## 두 가지 핵심 예측 모드 (Dual Prediction Modes)
+- 지금 설계하려는 TLC, QLC, Hybrid(SLC+QLC) 구성이 특정 워크로드에서 얼마나 버티는가?
+- 실제 노드에서 수집된 WAF, 온도, spare 상태를 기준으로 특정 드라이브의 수명 추세는 어떤가?
+- 클러스터 안에서 어떤 노드와 디스크가 먼저 확인 대상인가?
 
-RedPulse 시뮬레이터는 사용자의 기획 단계와 검증 단계에 맞춰 가장 효율적인 두 가지 예측 모드를 제공합니다.
+RedPulse는 SSD 수명 예측과 운영 관제에 초점을 둔 기술 검증용 도구입니다.
 
-### 1. 100% 가상 스펙 시뮬레이션 (PreFlight Mode)
-- **개요:** 물리적인 장비 장착 없이 순수 소프트웨어 환경에서 아키텍처를 테스트.
-- **용도:** 스토리지 도입 전, "만약 4TB QLC 앞에 100GB SLC로 캐시를 구성한다면?" 이라는 아키텍처 설계와 예산 기획 단계.
-- **이점:** 장비 소모액 및 소모 시간 **Zero**. 웹에서 슬라이더만 조절하여 향후 수명 곡선을 즉시 예측.
+## Demo
 
-### 2. 샘플링 실측 기반 AI 추론 (LiveOps Mode)
-- **개요:** 실제 서버에 디스크를 장착한 뒤, 몇 시간 이내의 **아주 짧고 강도 높은 초기 테스트**만 진행하여 실제 초기 데이터를 확보.
-- **용도:** 짧은 시간 동안 측정된 실제 시스템의 쓰기 증폭(Real WAF) 및 초기 캐시 히트율 등의 실측(Telemetry) 로우 데이터를 AI에 주입.
-- **이점:** 실제 하드웨어의 피로마모(Wear-out)는 최소화하면서도, AI가 초기 기울기 패턴을 분석하여 향후 3~5년 간의 전체 수명 곡선을 **가장 높은 신뢰도로 끝까지 시뮬레이션(Extrapolation)** 함.
+<video src="docs/redpulse_demo.mp4" controls width="100%"></video>
 
----
+[![RedPulse demo video](docs/simulator_preflight.png)](docs/redpulse_demo.mp4)
 
-## 주요 워크플로우
+[데모 영상 열기](docs/redpulse_demo.mp4)
 
-- **디바이스 토폴로지 설정**: 순수 고내구성(TLC), 고용량(QLC), 하이브리드(SLC+QLC) 방식 지원.
-- **데이터 분석 및 매핑**: (LiveOps 구동 시) 사용자 환경의 실제 서버 텔레메트리 데이터를 수집하여 AI 기반 궤적 보정.
-- **다중 노드 클러스터 대시보드**: 수백 대의 노드와 디스크 베이 상태를 한눈에 모니터링하는 엔터프라이즈 모니터링.
+데모 영상은 현재 구현된 핵심 화면을 순서대로 보여줍니다.
 
----
+1. PreFlight Simulator: SSD 스펙과 워크로드를 넣어 수명 곡선을 계산합니다.
+2. Cluster Grid: 여러 노드와 디스크 베이의 상태를 한눈에 봅니다.
+3. Node Detail: 특정 노드의 드라이브 목록과 상태를 확인합니다.
 
-## 📸 플랫폼 주요 화면 (Screenshots)
+## 핵심 기능
 
-### 1. 시뮬레이터 및 실시간 수명 예측 (PreFlight / LiveOps)
-![Simulator & Prediction](docs/simulator_preflight.png)
+### 1. PreFlight SSD 수명 시뮬레이션
 
-### 2. 엔터프라이즈 클러스터 모니터링 (Cluster Grid)
-![Cluster Grid](docs/cluster_grid.png)
+물리 장비를 장시간 소모하지 않고 SSD 구성과 워크로드 조건을 바꿔가며 예상 수명 곡선을 계산합니다.
 
-### 3. 특정 노드 및 개별 드라이브 AI 분석 (Node Detail)
-![Node & Drive Detail](docs/node_detail.png)
+- TLC, QLC, Hybrid(SLC+QLC) 토폴로지 선택
+- 상용 SSD 모델 스펙 기반 시뮬레이션
+- 커스텀 TBW, 용량, 일일 쓰기량, 랜덤 I/O 비율 입력
+- Write-back / Write-through 캐시 정책 비교
+- 결과: 예상 수명, 평균 WAF, 캐시 히트율, health curve
 
-### 4. TCO 및 FinOps 리스크 관리 (Impact)
-![FinOps Impact](docs/finops_impact.png)
+### 2. Single Drive AI 예측
 
-### 5. 자동화된 경영진 리포트 (Executive Report)
-![Executive Report](docs/executive_report.png)
+실제 텔레메트리 DB에 쌓인 노드/드라이브 데이터를 선택해 단일 SSD의 잔여 수명을 예측합니다.
 
----
+- 노드 선택 후 해당 노드의 드라이브 선택
+- lookback 기간과 수집 간격 설정
+- LSTM 기반 시계열 추론과 방어적 fallback 로직
+- 결과: 예상 수명, 95% 신뢰구간, 수명 곡선
 
-## 🚀 실행 및 배포 가이드 (Getting Started)
+### 3. Cluster Grid 관제
 
-### 1. 중앙 대시보드 서버 통합 실행 (Docker)
-Docker Compose를 사용하여 백엔드와 프론트엔드를 한 번에 실행할 수 있습니다.
+다중 노드 환경에서 어떤 노드와 디스크가 우선 확인 대상인지 빠르게 파악합니다.
+
+- 전체 노드/디스크 상태 요약
+- Critical / Warning / Healthy 필터
+- 노드 검색
+- 노드 상세 drawer
+- 특정 노드에서 Single Drive AI 분석 화면으로 이동
+
+### 4. Telemetry Agent / CLI
+
+운영 노드 또는 데모 환경에서 디스크 텔레메트리를 백엔드로 전송합니다.
+
+- mock 디스크 상태 전송
+- 노드명과 여러 드라이브 ID 자동 포함
+- 수집 항목: WAF, temperature, PE cycles, available spare, throughput, IOPS
+
+## 대표 사용 시나리오
+
+### 시나리오 A: 도입 전 스토리지 구성 검증
+
+1. Simulator 탭에서 SSD 모델을 선택합니다.
+2. 일일 쓰기량과 랜덤 I/O 비율을 입력합니다.
+3. TLC, QLC, Hybrid 구성을 바꿔가며 예상 수명 곡선을 비교합니다.
+4. 특정 워크로드에서 QLC 단독 구성이 충분한지, Hybrid cache가 필요한지 판단합니다.
+
+### 시나리오 B: 실제 노드 텔레메트리 기반 분석
+
+1. 에이전트 또는 CLI가 노드별 디스크 상태를 `/api/v1/telemetry/ingest`로 전송합니다.
+2. Cluster Grid에서 새 노드와 디스크 상태를 확인합니다.
+3. 특정 노드의 drawer를 열어 디스크별 health를 확인합니다.
+4. Single Drive AI에서 노드와 드라이브를 선택하고 예측을 실행합니다.
+
+### 시나리오 C: 클러스터 상태 점검
+
+1. Cluster Grid를 열어 전체 health, critical, warning 수를 확인합니다.
+2. severity 필터로 위험 노드만 좁힙니다.
+3. Node Detail에서 어떤 슬롯과 drive ID가 문제인지 확인합니다.
+4. 필요한 경우 Single Drive AI로 이동해 수명 추세를 더 자세히 봅니다.
+
+## 빠른 시작
+
+### Docker Compose
 
 ```bash
 docker-compose up --build
 ```
-- **웹 대시보드**: `http://localhost:5173`
-- **백엔드 API**: `http://localhost:8000`
 
-### 2. 스토리지 노드 에이전트 배포 (CLI Agent)
-실제 수집이 필요한 각 서버(Linux)에서 에이전트를 데몬 모드로 실행하여 데이터를 중앙 서버로 보고합니다.
+- Web UI: `http://localhost:5173`
+- Backend API: `http://localhost:8000`
+
+Docker로 실행한 백엔드에 샘플 텔레메트리를 넣으려면:
 
 ```bash
-# 에이전트 60초 주기로 중앙 서버에 보고 시작
-./redpulse-cli.py report --node "Node-01" --interval 60
+REDPULSE_API_BASE=http://localhost:8000 python3 redpulse-cli.py report --node Node-01 --once
 ```
-- 에이전트는 자동으로 로컬 디스크를 감지하여 상태 정보를 대시보드로 실시간 Push합니다.
 
----
+### Local Development
 
-## 기술 스택 (Tech Stack)
-- **Backend**: Python 3, FastAPI, Scikit-Learn (AI Regression / Time-Series Extrapolation)
-- **Frontend**: React 18, Vite, Recharts, CSS (Glassmorphism & Dark Mode)
+백엔드:
 
----
-
-### 수동 설치 (Manual Setup)
-매뉴얼한 디버깅이나 개발 환경 구동 시 아래 명령어를 참고하세요.
-
-#### 백엔드 (FastAPI)
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+python backend/run_server.py
 ```
 
-#### 프론트엔드 (React)
+프론트엔드:
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
----
+- Web UI: `http://localhost:5173`
+- Backend API: `http://localhost:8085`
 
-## 디렉토리 구조
-```text
-redpulse/
-├── backend/
-│   ├── main.py              # FastAPI 서버 및 API 라우터
-│   ├── requirements.txt     # 파이썬 의존성
-│   ├── ai/
-│   │   └── model.py         # 실측 데이터 구간 기반 향후 예측 AI (Extrapolation) 로직
-│   └── simulator/
-│       ├── engine.py        # 시계열 물리 기반 가상 수명 엔진 (Virtual Mode)
-│       └── storage_models.py# 드라이브 마모 수학적 물리 모델 구성
-├── frontend/
-│   ├── index.html
-│   ├── package.json
-│   └── src/
-│       ├── App.jsx          # 모드 선택(가상/실측) 및 메인 대시보드 차트
-│       └── index.css        # 프리미엄 다크모드 UI
-└── README.md
+로컬 백엔드에 샘플 텔레메트리를 한 번 전송하려면:
+
+```bash
+python3 redpulse-cli.py report --node Node-01 --once
 ```
+
+## CLI 예시
+
+지원 SSD 모델 목록:
+
+```bash
+python3 redpulse-cli.py ls-models
+```
+
+PreFlight 시뮬레이션:
+
+```bash
+python3 redpulse-cli.py simulate \
+  --model samsung_pm9a3_3_84tb \
+  --writes 2000 \
+  --random-ratio 80
+```
+
+텔레메트리 전송:
+
+```bash
+python3 redpulse-cli.py report --node Node-01 --interval 60
+```
+
+## API 개요
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/simulate` | SSD 구성과 워크로드 기반 수명 시뮬레이션 |
+| `POST` | `/api/v1/telemetry/ingest` | 노드/드라이브 텔레메트리 저장 |
+| `GET` | `/api/v1/cluster/stats` | 클러스터 요약 지표 조회 |
+| `GET` | `/api/v1/cluster/topology` | 최신 노드/디스크 토폴로지 조회 |
+| `GET` | `/api/v1/cluster/node/{node}/drives` | 특정 노드의 드라이브 목록 조회 |
+| `GET` | `/api/v1/cluster/node/{node}/history` | 특정 노드/드라이브 히스토리 조회 |
+| `GET` | `/api/v1/cluster/node/{node}/predict` | 텔레메트리 기반 단일 드라이브 수명 예측 |
+| `GET` | `/api/v1/models` | 상용 SSD 모델 목록 조회 |
+
+## 화면 구성
+
+### PreFlight Simulator
+
+![Simulator](docs/simulator_preflight.png)
+
+### Cluster Grid
+
+![Cluster Grid](docs/cluster_grid.png)
+
+### Node Detail
+
+![Node Detail](docs/node_detail.png)
+
+## 프로젝트 구조
+
+```text
+RedPulse/
+├── backend/
+│   ├── main.py                 # FastAPI routes
+│   ├── database.py             # SQLite telemetry storage
+│   ├── ai/                     # LSTM / inference facade
+│   └── simulator/              # SSD wear simulation models
+├── frontend/
+│   ├── src/App.jsx             # Main React shell
+│   ├── src/components/         # Simulator, cluster, node views
+│   └── src/api.js              # API base URL and endpoint map
+├── agent/
+│   └── agent.py                # Telemetry agent prototype
+├── docs/
+│   ├── redpulse_demo.mp4       # README demo video
+│   └── *.png                   # Product screenshots
+└── redpulse-cli.py             # CLI wrapper for demo and telemetry
+```
+
+## 현재 구현 범위와 한계
+
+- 실제 Linux SMART/NVMe metric 파싱은 아직 prototype 단계이며, 기본 데모는 mock telemetry를 사용합니다.
+- Single Drive AI 예측은 현재 일부 drive profile 값을 고정값으로 사용합니다.
+- SQLite 기반 저장소는 데모와 PoC에 적합하며, 장기 운영 환경에서는 별도 time-series DB 검토가 필요합니다.
+- 이 저장소의 우선순위는 SSD 수명 예측, 텔레메트리 수집, 클러스터 관제입니다.

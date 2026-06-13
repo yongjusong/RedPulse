@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import useAppStore from './store';
 import SingleNodeView from './components/SingleNodeView';
 import ClusterView from './components/ClusterView';
-import EconomicsView from './components/EconomicsView';
 import { API_URLS, fetchApi } from './api';
 
 const translations = {
@@ -10,7 +9,6 @@ const translations = {
     title: "AI-Based SSD Lifespan Simulator",
     simMode: "Simulator",
     telemetryMode: "Single Drive AI",
-    finopsMode: "Impact (FinOps)",
     configTitleV: "SSD Design Parameters",
     configTitleT: "Telemetry Observation",
     vendorModel: "SSD Model (Spec)",
@@ -209,7 +207,6 @@ function App() {
             <div className={`doc-tab ${activeTab === 'simulator' ? 'active' : ''}`} onClick={() => setTab('simulator')} style={{color: activeTab === 'simulator' ? '#fff' : '#a1a1aa', borderBottom: activeTab === 'simulator' ? '2px solid #fff' : '2px solid transparent'}}>Simulator</div>
             <div className={`doc-tab ${activeTab === 'predictor' ? 'active' : ''}`} onClick={() => setTab('predictor')} style={{color: activeTab === 'predictor' ? '#fff' : '#a1a1aa', borderBottom: activeTab === 'predictor' ? '2px solid #fff' : '2px solid transparent'}}>Single Drive AI</div>
             <div className={`doc-tab ${activeTab === 'cluster' ? 'active' : ''}`} onClick={() => setTab('cluster')} style={{color: activeTab === 'cluster' ? '#fff' : '#a1a1aa', borderBottom: activeTab === 'cluster' ? '2px solid #fff' : '2px solid transparent'}}>Cluster Grid</div>
-            <div className={`doc-tab ${activeTab === 'impact' ? 'active' : ''}`} onClick={() => setTab('impact')} style={{color: activeTab === 'impact' ? '#fff' : '#a1a1aa', borderBottom: activeTab === 'impact' ? '2px solid #fff' : '2px solid transparent'}}>Impact (FinOps)</div>
           </div>
         </div>
         <div>
@@ -478,7 +475,7 @@ function App() {
         )}
 
         <main className="doc-main">
-          {(activeTab === 'simulator' || activeTab === 'predictor') ? <SingleNodeView t={t} /> : activeTab === 'cluster' ? <ClusterView t={t} /> : <EconomicsView />}
+          {(activeTab === 'simulator' || activeTab === 'predictor') ? <SingleNodeView t={t} /> : <ClusterView t={t} />}
         </main>
       </div>
     </div>
