@@ -12,11 +12,7 @@ RedPulse는 SSD 수명 예측과 운영 관제에 초점을 둔 기술 검증용
 
 ## Demo
 
-<video src="docs/redpulse_demo.mp4" controls width="100%"></video>
-
-[![RedPulse demo video](docs/simulator_preflight.png)](docs/redpulse_demo.mp4)
-
-[데모 영상 열기](docs/redpulse_demo.mp4)
+![RedPulse demo](docs/redpulse_demo.gif)
 
 데모 영상은 현재 구현된 핵심 화면을 순서대로 보여줍니다.
 
@@ -197,7 +193,7 @@ RedPulse/
 ├── agent/
 │   └── agent.py                # Telemetry agent prototype
 ├── docs/
-│   ├── redpulse_demo.mp4       # README demo video
+│   ├── redpulse_demo.gif       # README demo animation
 │   └── *.png                   # Product screenshots
 └── redpulse-cli.py             # CLI wrapper for demo and telemetry
 ```
